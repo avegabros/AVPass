@@ -429,6 +429,8 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
 
   // layer drag-to-reorder state
   const [dragReorderFrom, setDragReorderFrom] = React.useState<string | null>(null);
+  // persists drag-reordered position of special layers (photo/sig/qr)
+  const [specialLayerOrder, setSpecialLayerOrder] = React.useState<string[]>(["photo", "sig", "qr"]);
 
   // shape state
   const [selectedShapeId, setSelectedShapeId] = React.useState<string | null>(null);
@@ -604,14 +606,18 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
   const buildLayers = React.useCallback((sd: IDSide, isBack: boolean): Layer[] => {
     const layers: Layer[] = [];
     let z = 1;
-    if (sd.showPhoto) layers.push({ id: 'photo', kind: 'photo', label: 'Employee Photo', visible: sd.showPhoto, locked: isLocked('photo'), zIndex: z++ });
-    if (sd.showSig) layers.push({ id: 'sig', kind: 'sig', label: 'Signature', visible: sd.showSig, locked: isLocked('sig'), zIndex: z++ });
-    if (isBack && sd.showQR) layers.push({ id: 'qr', kind: 'qr', label: 'QR Code', visible: !!sd.showQR, locked: isLocked('qr'), zIndex: z++ });
+    // Special layers ordered by specialLayerOrder
+    const orderedSpecial = specialLayerOrder.filter(id => id !== 'qr' || isBack);
+    orderedSpecial.forEach(id => {
+      if (id === 'photo') layers.push({ id: 'photo', kind: 'photo', label: 'Employee Photo', visible: !!sd.showPhoto, locked: isLocked('photo'), zIndex: z++ });
+      else if (id === 'sig') layers.push({ id: 'sig', kind: 'sig', label: 'Signature', visible: !!sd.showSig, locked: isLocked('sig'), zIndex: z++ });
+      else if (id === 'qr') layers.push({ id: 'qr', kind: 'qr', label: 'QR Code', visible: !!sd.showQR, locked: isLocked('qr'), zIndex: z++ });
+    });
     (sd.canvasImages || []).forEach((ci: CanvasImage) => { layers.push({ id: ci.id, kind: 'canvasimg', label: ci.label, visible: true, locked: isLocked(ci.id), zIndex: z++, thumb: ci.src }); });
     (sd.shapes || []).forEach((sh: ShapeElement) => { layers.push({ id: sh.id, kind: 'shape', label: `${sh.type.charAt(0).toUpperCase() + sh.type.slice(1)}`, visible: true, locked: isLocked(sh.id), zIndex: z++, color: sh.fill !== 'transparent' ? sh.fill : sh.stroke }); });
     sd.fields.forEach((f: IDField) => { layers.push({ id: f.id, kind: 'text', label: f.label, visible: f.visible, locked: isLocked(f.id), zIndex: z++, color: f.color }); });
     return layers.reverse();
-  }, [lockedLayers]);
+  }, [lockedLayers, specialLayerOrder]);
 
   const layers = buildLayers(side, activeSide === 'back');
 
@@ -629,9 +635,12 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
   const toggleLayerVisible = (id: string) => {
     if (id === 'photo') updateSideProps({ showPhoto: !side.showPhoto });
     else if (id === 'sig') updateSideProps({ showSig: !side.showSig });
-    else if (id === 'qr') setBack((p: IDSide) => ({ ...p, showQR: !p.showQR }));
+    else if (id === 'qr') setSide((p: IDSide) => ({ ...p, showQR: !p.showQR }));
     else if ((side.canvasImages || []).find((ci: CanvasImage) => ci.id === id)) {/* canvas images always visible, handled by opacity */}
-    else if ((side.shapes || []).find((s: ShapeElement) => s.id === id)) updateShape(id, {});
+    else if ((side.shapes || []).find((s: ShapeElement) => s.id === id)) {
+      const sh = (side.shapes || []).find((s: ShapeElement) => s.id === id)!;
+      updateShape(id, { fillOpacity: sh.fillOpacity > 0 ? 0 : 80 });
+    }
     else updateField(id, { visible: !side.fields.find((f: IDField) => f.id === id)?.visible });
   };
 
@@ -1218,7 +1227,30 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
                         onDrop={e => {
                           (e.currentTarget as HTMLElement).classList.remove('layer-row-drag-over');
                           if (!dragReorderFrom || dragReorderFrom === layer.id) return;
-                          // Reorder shapes or fields
+                          const specialIds = ['photo', 'sig', 'qr'];
+                          const fromIsSpecial = specialIds.includes(dragReorderFrom);
+                          const toIsSpecial = specialIds.includes(layer.id);
+                          // Reorder special layers (photo/sig/qr)
+                          if (fromIsSpecial && toIsSpecial) {
+                            setSpecialLayerOrder(prev => {
+                              const arr = [...prev];
+                              const fi = arr.indexOf(dragReorderFrom), ti = arr.indexOf(layer.id);
+                              if (fi !== -1 && ti !== -1) { const [item] = arr.splice(fi, 1); arr.splice(ti, 0, item); }
+                              return arr;
+                            });
+                          }
+                          // Reorder canvas images
+                          const fromCImg = (side.canvasImages || []).find((ci: CanvasImage) => ci.id === dragReorderFrom);
+                          const toCImg = (side.canvasImages || []).find((ci: CanvasImage) => ci.id === layer.id);
+                          if (fromCImg && toCImg) {
+                            setSide((p: IDSide) => {
+                              const arr = [...(p.canvasImages || [])];
+                              const fi = arr.findIndex(ci => ci.id === dragReorderFrom), ti = arr.findIndex(ci => ci.id === layer.id);
+                              const [item] = arr.splice(fi, 1); arr.splice(ti, 0, item);
+                              return { ...p, canvasImages: arr };
+                            });
+                          }
+                          // Reorder shapes
                           const fromShape = (side.shapes || []).find((s: ShapeElement) => s.id === dragReorderFrom);
                           const toShape = (side.shapes || []).find((s: ShapeElement) => s.id === layer.id);
                           if (fromShape && toShape) {
@@ -1229,6 +1261,7 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
                               return { ...p, shapes: arr };
                             });
                           }
+                          // Reorder text fields
                           const fromField = side.fields.find((f: IDField) => f.id === dragReorderFrom);
                           const toField = side.fields.find((f: IDField) => f.id === layer.id);
                           if (fromField && toField) {

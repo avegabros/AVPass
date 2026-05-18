@@ -14,6 +14,7 @@ export interface ApiEmployee {
   department?: string;
   company?: string;
   status?: string;
+  employee_status?: string;
   [key: string]: any;
 }
 
@@ -25,19 +26,21 @@ interface LoadDatabaseProps {
 const LIMIT = 10000;
 
 export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps) {
-  const [employees, setEmployees]     = useState<ApiEmployee[]>([]);
-  const [isLoading, setIsLoading]     = useState(true);
-  const [error, setError]             = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage]               = useState(0);
-  const [totalCount, setTotalCount]   = useState(0);
+  const [employees, setEmployees]         = useState<ApiEmployee[]>([]);
+  const [isLoading, setIsLoading]         = useState(true);
+  const [error, setError]                 = useState("");
+  const [searchQuery, setSearchQuery]     = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [page, setPage]                   = useState(0);
+  const [totalCount, setTotalCount]       = useState(0);
 
-  const fetchEmployees = useCallback(async (query: string, pg: number) => {
+  const fetchEmployees = useCallback(async (query: string, company: string, pg: number) => {
     setIsLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ order: "asc", sort: "id", limit: LIMIT.toString(), page: pg.toString() });
       if (query.trim()) params.append("search", query.trim());
+      if (company.trim()) params.append("company", company.trim());
       const res = await fetch(`${API_URL}/employees?${params}`);
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);
       const data = await res.json();
@@ -54,9 +57,9 @@ export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps)
   }, [setEmployeeDatabase]);
 
   useEffect(() => {
-    const t = setTimeout(() => fetchEmployees(searchQuery, page), 400);
+    const t = setTimeout(() => fetchEmployees(searchQuery, companyFilter, page), 400);
     return () => clearTimeout(t);
-  }, [searchQuery, page, fetchEmployees]);
+  }, [searchQuery, companyFilter, page, fetchEmployees]);
 
   const card: React.CSSProperties = { background: "#fff", borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", overflow: "hidden" };
   const th: React.CSSProperties   = { padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.8px", textAlign: "left", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" };
@@ -78,7 +81,13 @@ export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps)
               onChange={e => { setSearchQuery(e.target.value); setPage(0); }}
               style={{ paddingLeft: "32px", paddingRight: "12px", paddingTop: "8px", paddingBottom: "8px", border: "1px solid #e2e8f0", borderRadius: "10px", fontSize: "13px", outline: "none", width: "220px", color: "#0f172a", background: "#fff" }} />
           </div>
-          <button onClick={() => fetchEmployees(searchQuery, page)}
+          <div style={{ position: "relative" }}>
+            <Search size={14} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }} />
+            <input type="text" placeholder="Filter by company..." value={companyFilter}
+              onChange={e => { setCompanyFilter(e.target.value); setPage(0); }}
+              style={{ paddingLeft: "32px", paddingRight: "12px", paddingTop: "8px", paddingBottom: "8px", border: "1px solid #e2e8f0", borderRadius: "10px", fontSize: "13px", outline: "none", width: "200px", color: "#0f172a", background: "#fff" }} />
+          </div>
+          <button onClick={() => fetchEmployees(searchQuery, companyFilter, page)}
             style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", border: "1px solid #e2e8f0", borderRadius: "10px", background: "#fff", fontSize: "13px", fontWeight: 600, color: "#475569", cursor: "pointer" }}>
             <RefreshCw size={14} style={isLoading ? { animation: "spin 1s linear infinite" } : undefined} /> Refresh
           </button>
@@ -117,6 +126,8 @@ export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps)
                   <th style={th}>Employee ID</th>
                   <th style={th}>Full Name</th>
                   <th style={th}>Position</th>
+                  <th style={th}>Company</th>
+                  <th style={th}>Status</th>
                   <th style={th}><span style={{ display: "flex", alignItems: "center", gap: "4px" }}><Phone size={11}/>Emergency #</span></th>
                   <th style={th}><span style={{ display: "flex", alignItems: "center", gap: "4px" }}><UserCheck size={11}/>Contact Person</span></th>
                   <th style={th}>Photo</th>
@@ -132,6 +143,14 @@ export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps)
                     <td style={{ ...td, fontFamily: "monospace", fontWeight: 700, color: "#667eea", fontSize: "12px" }}>{emp.employee_id || "—"}</td>
                     <td style={{ ...td, fontWeight: 600 }}>{emp.full_name || "—"}</td>
                     <td style={{ ...td, color: "#64748b" }}>{emp.position || <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>}</td>
+                    <td style={{ ...td, fontSize: "12px" }}>{emp.company
+                      ? <span style={{ background: "#eff6ff", color: "#2563eb", borderRadius: "6px", padding: "2px 8px", fontSize: "11px", fontWeight: 600 }}>{emp.company}</span>
+                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>}
+                    </td>
+                    <td style={td}>{emp.employee_status
+                      ? <span style={{ background: ["probationary","regular","casual","fixed term","part-time"].includes((emp.employee_status||"").toLowerCase()) ? "#ecfdf5" : "#fff7ed", color: ["probationary","regular","casual","fixed term","part-time"].includes((emp.employee_status||"").toLowerCase()) ? "#059669" : "#ea580c", borderRadius: "6px", padding: "2px 8px", fontSize: "10px", fontWeight: 700, textTransform: "capitalize" }}>{emp.employee_status}</span>
+                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>}
+                    </td>
                     <td style={td}>{emp.emergency_contact_num ? <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{emp.emergency_contact_num}</span> : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>}</td>
                     <td style={{ ...td, color: "#64748b", fontSize: "12px" }}>{emp.emergency_contact_person || <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>}</td>
                     <td style={td}>{emp.picture ? <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px" }}>✓ Yes</span> : <span style={{ background: "#f8fafc", color: "#cbd5e1", fontSize: "10px", padding: "2px 8px", borderRadius: "20px" }}>—</span>}</td>

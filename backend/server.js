@@ -168,7 +168,7 @@ async function getHrisToken() {
 app.get('/api/employees', async (req, res) => {
   try {
       const token = await getHrisToken();
-      const { search, page, limit } = req.query;
+      const { search, page, limit, company } = req.query;
       
       const url = new URL('https://api.avegabros.org/website/id-employees');
       url.searchParams.append('key', process.env.HRIS_API_KEY);
@@ -182,6 +182,21 @@ app.get('/api/employees', async (req, res) => {
       const response = await axios.get(url.toString(), {
           headers: { 'Authorization': `Bearer ${token}` }
       });
+
+      // If company filter is provided, filter client-side (HRIS API may not support it natively)
+      if (company && typeof company === 'string' && company.trim()) {
+        const companyLower = company.trim().toLowerCase();
+        const rawData = response.data;
+        const list = Array.isArray(rawData) ? rawData : (rawData?.data ?? []);
+        const filtered = list.filter(e =>
+          (e.company || '').toLowerCase().includes(companyLower)
+        );
+        if (Array.isArray(rawData)) {
+          return res.json(filtered);
+        } else {
+          return res.json({ ...rawData, data: filtered, total: filtered.length });
+        }
+      }
 
       res.json(response.data);
   } catch (error) {

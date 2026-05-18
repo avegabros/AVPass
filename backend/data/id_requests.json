@@ -1,0 +1,97 @@
+[
+  {
+    "id": "REQ-1776135160452",
+    "employeeName": "MAKIG-ANGAY, NIKKI",
+    "empCode": "ABMCI-211002",
+    "company": "",
+    "department": "",
+    "position": "Ordinary Seaman",
+    "purpose": "Replacement for old ID",
+    "requestedBy": "admin",
+    "status": "completed",
+    "statusHistory": [
+      {
+        "status": "pending",
+        "note": "Request submitted",
+        "changedAt": "2026-04-14T02:52:40.452Z"
+      },
+      {
+        "status": "processing",
+        "note": "",
+        "changedAt": "2026-04-14T02:54:05.487Z"
+      },
+      {
+        "status": "approved",
+        "note": "",
+        "changedAt": "2026-04-14T02:54:17.646Z"
+      },
+      {
+        "status": "completed",
+        "note": "",
+        "changedAt": "2026-04-14T02:54:27.719Z"
+      }
+    ],
+    "createdAt": "2026-04-14T02:52:40.452Z",
+    "updatedAt": "2026-04-14T02:54:27.719Z"
+  },
+  {
+    "id": "REQ-1776135623373",
+    "employeeName": "DAWATON, CRISJUNE",
+    "empCode": "ABISC-250201",
+    "company": "",
+    "department": "",
+    "position": "IT Support Staff",
+    "purpose": "afsdfad",
+    "requestedBy": "user",
+    "status": "rejected",
+    "statusHistory": [
+      {
+        "status": "pending",
+        "note": "Request submitted",
+        "changedAt": "2026-04-14T03:00:23.373Z"
+      },
+      {
+        "status": "approved",
+        "note": "for id printing",
+        "changedAt": "2026-04-14T03:02:24.973Z"
+      },
+      {
+        "status": "rejected",
+        "note": "",
+        "changedAt": "2026-04-14T03:27:56.730Z"
+      }
+    ],
+    "createdAt": "2026-04-14T03:00:23.373Z",
+    "updatedAt": "2026-04-14T03:27:56.730Z"
+  },
+  {
+    "id": "REQ-1776135854269",
+    "employeeName": "BEDUA, BEN JOHN",
+    "empCode": "ABISC-110202",
+    "company": "",
+    "department": "",
+    "position": "Apprentice Deck",
+    "purpose": "",
+    "requestedBy": "user",
+    "status": "completed",
+    "statusHistory": [
+      {
+        "status": "pending",
+        "note": "Request submitted",
+        "changedAt": "2026-04-14T03:04:14.269Z"
+      },
+      {
+        "status": "approved",
+        "note": "",
+        "changedAt": "2026-04-14T03:25:43.532Z"
+      },
+      {
+        "status": "completed",
+        "note": "",
+        "changedAt": "2026-04-14T03:27:07.600Z"
+      }
+    ],
+    "createdAt": "2026-04-14T03:04:14.269Z",
+    "updatedAt": "2026-04-14T03:27:07.600Z"
+  }
+]
