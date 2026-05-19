@@ -7,17 +7,17 @@ import { resolveImg, hexToColorFilter, hexToColorFilterWhite } from '../../utils
 
 // ── DEFAULT FIELDS ──
 const defaultFrontFields: IDField[] = [
-  { id: 'nickname', label: 'First Name / Nickname', value: 'NICKNAME', x: 50, y: 62, fontSize: 22, color: '#ffffff', bold: true, italic: false, align: 'left', visible: false },
-  { id: 'idnum',    label: 'ID Number',              value: 'ID-NUMBER', x: 32, y: 92, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
-  { id: 'fullname', label: 'Full Name',               value: 'FULL NAME', x: 13, y: 75, fontSize: 10, color: '#ffffff', bold: true, italic: false, align: 'left', visible: true },
-  { id: 'position', label: 'Position / Designation',  value: 'POSITION', x: 32, y: 92, fontSize: 9, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
-  { id: 'company',  label: 'Company',                 value: '', x: 50, y: 88, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'center', visible: true },
+  { id: 'nickname', label: 'First Name / Nickname', value: 'JESUS', x: 50, y: 62, fontSize: 22, color: '#ffffff', bold: true, italic: false, align: 'left', visible: false },
+  { id: 'idnum',    label: 'ID Number',              value: 'ABISC-231003', x: 32, y: 92, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
+  { id: 'fullname', label: 'Full Name',               value: 'JESUS B. ILLUSTRISIMO', x: 13, y: 75, fontSize: 10, color: '#ffffff', bold: true, italic: false, align: 'left', visible: true },
+  { id: 'position', label: 'Position / Designation',  value: 'ASSISTANT PORT ENGINEER', x: 32, y: 92, fontSize: 9, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
+  { id: 'company',  label: 'Company',                 value: '', x: 50, y: 88, fontSize: 8, color: '#ffffff', bold: false, italic: false, align: 'center', visible: false },
 ];
 
 const defaultBackFields: IDField[] = [
   { id: 'emergency_num',    label: 'Emergency Number',         value: '09123456789',         x: 35, y: 20, fontSize: 10, color: '#ffffff', bold: false,  italic: false, align: 'center', visible: true },
   { id: 'emergency_person', label: 'Emergency Contact Person', value: 'Contact Person Name', x: 43, y: 15, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'center', visible: true },
-  { id: 'company_back',     label: 'Company',                  value: 'COMPANY',                    x: 50, y: 88, fontSize: 10,  color: '#ffffff', bold: false, italic: false, align: 'center', visible: true },
+  { id: 'company_back',     label: 'Company',                  value: '',                    x: 50, y: 88, fontSize: 8,  color: '#ffffff', bold: false, italic: false, align: 'center', visible: false },
 ];
 
 // ── SHARED STYLES & COMPONENTS ──
@@ -389,7 +389,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
       photoX:50, photoY:49, photoW:70, photoH:50, showPhoto:false,
       sigX:35,   sigY:86,  sigW:40,  sigH:8,   showSig:false,
       showQR:true, qrX:50, qrY:42, qrSize:70,
-      qrUrl:'https://employee.avegabros.com/verify/',
+      qrUrl:'https://employee.abas.ph/verify/',
       qrFg:'#000000', qrBg:'#ffffff',
     }
   );
@@ -423,7 +423,8 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
 
   // ── notifications ──
   const [msg,       setMsg]       = React.useState<{type:'success'|'error';text:string}|null>(null);
-  const [savingID,  setSavingID]  = React.useState(false);
+  const [savingID,    setSavingID]    = React.useState(false);
+  const [qrGenerating, setQrGenerating] = React.useState(false);
   const [showFlip,  setShowFlip]  = React.useState(false);
 
   // ── Mobile responsive ──
@@ -461,8 +462,8 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
 
   const generateQR = React.useCallback(async (empCode: string, url: string, fg: string, bg: string) => {
     if (!empCode) { setQrDataUrl(PLACEHOLDER_QR); return; }
+    setQrGenerating(true);
     try {
-      // Fetch the HMAC hash for this employee code so the QR URL never exposes the raw ID
       let token = empCode;
       try {
         const hashRes = await fetch('/api/hash/' + encodeURIComponent(empCode));
@@ -480,6 +481,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
       });
       setQrDataUrl(dataUrl);
     } catch { setQrDataUrl(PLACEHOLDER_QR); }
+    finally { setQrGenerating(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -487,7 +489,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
   React.useEffect(() => {
     const empCode = selectedEmployee?.empCode || '';
     selectedEmpCode.current = empCode;
-    generateQR(empCode, back.qrUrl || 'https://employee.avegabros.com/verify/', back.qrFg || '#000000', back.qrBg || '#ffffff');
+    generateQR(empCode, back.qrUrl || 'https://employee.abas.ph/verify/', back.qrFg || '#000000', back.qrBg || '#ffffff');
   }, [selectedEmployee, back.qrUrl, back.qrFg, back.qrBg, generateQR]);
 
   const [flipFace,  setFlipFace]  = React.useState<'front'|'back'>('front');
@@ -906,18 +908,20 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
     // Capture both sides - use renderSide (canvas renderer) for saving
     // html2canvas only captures visible elements; renderSide works for both
     const [fi, bi] = await Promise.all([renderSide('front'), renderSide('back')]);
-    const name = selectedEmployee?.name || editingID?.employeeName || '';
-    const pos  = selectedEmployee?.position || editingID?.position || '';
+    const name    = selectedEmployee?.name     || editingID?.employeeName || '';
+    const pos     = selectedEmployee?.position || editingID?.position     || '';
+    const empCode = selectedEmployee?.empCode  || '';
+    const company = (selectedEmployee as any)?.company || front.fields.find(f=>f.id==='company')?.value || '';
     try{
       if(editingID && editingID.id){
         // Update existing saved ID
         const res=await fetch(`${API_URL}/saved-ids/${editingID.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({employeeName:name,position:pos,frontImg:fi,backImg:bi,savedAt:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})})});
+          body:JSON.stringify({employeeName:name,position:pos,empCode,company,frontImg:fi,backImg:bi,savedAt:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})})});
         if(res.ok){ setMsg({type:'success',text:`ID updated for ${name}`}); if(onEditSaved) onEditSaved(editingID.id); }
         else setMsg({type:'error',text:'Failed to update ID'});
       } else {
         // Save new ID
-        const res=await fetch(`${API_URL}/saved-ids`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:`${selectedEmployee!.id}-${Date.now()}`,employeeName:name,position:pos,company:'',frontImg:fi,backImg:bi,savedAt:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})})});
+        const res=await fetch(`${API_URL}/saved-ids`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:`${selectedEmployee!.id}-${Date.now()}`,employeeName:name,position:pos,empCode,company,frontImg:fi,backImg:bi,savedAt:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})})});
         if(res.ok) setMsg({type:'success',text:`ID saved for ${name}`});
         else setMsg({type:'error',text:'Failed to save ID'});
       }
@@ -1147,8 +1151,8 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
           <button onClick={()=>downloadSide(activeSide)} style={{...navBtnStyle, background:'#f8fafc'}}>
             <Download size={14} color="#667eea"/> Export {activeSide}
           </button>
-          <button onClick={saveIDToServer} disabled={savingID||(!selectedEmployee&&!editingID)} style={{padding:'8px 16px',borderRadius:'8px',border:'none',background:(selectedEmployee||editingID)?'linear-gradient(135deg,#10b981,#059669)':'#e2e8f0',color:(selectedEmployee||editingID)?'#fff':'#94a3b8',cursor:(selectedEmployee||editingID)?'pointer':'not-allowed',fontSize:'13px',fontWeight:700,display:'flex',alignItems:'center',gap:'8px',boxShadow:(selectedEmployee||editingID)?'0 4px 14px rgba(16,185,129,0.3)':'none'}}>
-            {savingID?<Loader2 size={16} style={{animation:'spin 1s linear infinite'}}/>:<Save size={16}/>} Save ID
+          <button onClick={saveIDToServer} disabled={savingID||qrGenerating||(!selectedEmployee&&!editingID)} style={{padding:'8px 16px',borderRadius:'8px',border:'none',background:(selectedEmployee||editingID)?'linear-gradient(135deg,#10b981,#059669)':'#e2e8f0',color:(selectedEmployee||editingID)?'#fff':'#94a3b8',cursor:(selectedEmployee||editingID)&&!qrGenerating?'pointer':'not-allowed',fontSize:'13px',fontWeight:700,display:'flex',alignItems:'center',gap:'8px',boxShadow:(selectedEmployee||editingID)?'0 4px 14px rgba(16,185,129,0.3)':'none'}}>
+            {savingID?<Loader2 size={16} style={{animation:'spin 1s linear infinite'}}/>:qrGenerating?<Loader2 size={16} style={{animation:'spin 1s linear infinite'}}/>:<Save size={16}/>} {qrGenerating?'Generating QR...':'Save ID'}
           </button>
         </div>
       </header>
@@ -1260,7 +1264,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
                       <div>
                         <label style={{fontSize:'11px',color:'#64748b',fontWeight:500,display:'block',marginBottom:'4px'}}>Verify URL</label>
                         <input type="text" value={back.qrUrl||''} onChange={e=>setBack(p=>({...p,qrUrl:e.target.value}))}
-                          placeholder="https://employee.avegabros.com/verify/"
+                          placeholder="https://employee.abas.ph/verify/"
                           style={{width:'100%',background:'#fff',border:'1px solid #e2e8f0',borderRadius:'6px',padding:'6px 8px',fontSize:'11px',color:'#0f172a',outline:'none',boxSizing:'border-box'}}/>
                         <p style={{margin:'3px 0 0',fontSize:'10px',color:'#94a3b8'}}>Employee ID will be appended automatically</p>
                       </div>

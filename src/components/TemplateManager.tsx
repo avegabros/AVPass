@@ -39,16 +39,16 @@ interface CanvasImage {
 //  DEFAULT FIELDS
 // ─────────────────────────────────────────────────────────────
 const defaultFrontFields: IDField[] = [
-  { id: 'nickname', label: 'First Name / Nickname', value: 'NICKNAME', x: 35, y: 86, fontSize: 22, color: '#ffffff', bold: true, italic: false, align: 'left', visible: false },
-  { id: 'idnum',    label: 'ID Number',              value: 'ID-NUMBER', x: 32, y: 92, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
-  { id: 'fullname', label: 'Full Name',               value: 'FULL NAME', x: 13, y: 75, fontSize: 10, color: '#ffffff', bold: true, italic: false, align: 'left', visible: true },
-  { id: 'position', label: 'Position / Designation',  value: 'POSITION', x: 13, y: 79, fontSize: 9, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
-  { id: 'company',  label: 'Company',                 value: 'COMPANY', x: 50, y: 10, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'center', visible: true },
+  { id: 'nickname', label: 'First Name / Nickname', value: 'JESUS', x: 35, y: 86, fontSize: 22, color: '#ffffff', bold: true, italic: false, align: 'left', visible: false },
+  { id: 'idnum',    label: 'ID Number',              value: 'ABISC-231003', x: 32, y: 92, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
+  { id: 'fullname', label: 'Full Name',               value: 'JESUS B. ILLUSTRISIMO', x: 13, y: 75, fontSize: 10, color: '#ffffff', bold: true, italic: false, align: 'left', visible: true },
+  { id: 'position', label: 'Position / Designation',  value: 'ASSISTANT PORT ENGINEER', x: 13, y: 79, fontSize: 9, color: '#ffffff', bold: false, italic: false, align: 'left', visible: true },
+  { id: 'company',  label: 'Company',                 value: '', x: 50, y: 88, fontSize: 8, color: '#ffffff', bold: false, italic: false, align: 'center', visible: false },
 ];
 const defaultBackFields: IDField[] = [
   { id: 'emergency_person', label: 'Emergency Contact Person', value: 'Contact Person Name', x: 43, y: 15, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'center', visible: true },
   { id: 'emergency_num',    label: 'Emergency Number',         value: '09123456789',         x: 35, y: 20, fontSize: 10, color: '#ffffff', bold: false, italic: false, align: 'center', visible: true },
-  { id: 'company_back',     label: 'Company',                  value: 'COMPANY',                    x: 50, y: 88, fontSize: 8,  color: '#ffffff', bold: false, italic: false, align: 'center', visible: true },
+  { id: 'company_back',     label: 'Company',                  value: '',                    x: 50, y: 88, fontSize: 8,  color: '#ffffff', bold: false, italic: false, align: 'center', visible: false },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -534,7 +534,7 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
     photoX: 50, photoY: 48, photoW: 70, photoH: 50, showPhoto: false,
     sigX: 35, sigY: 85, sigW: 40, sigH: 8, showSig: false,
     showQR: true, qrX: 50, qrY: 42, qrSize: 70,
-    qrUrl: 'https://employee.avegabros.com/verify/',
+    qrUrl: 'https://employee.abas.ph/verify/',
     qrFg: '#000000', qrBg: '#ffffff',
   }));
 
