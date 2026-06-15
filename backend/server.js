@@ -9,10 +9,59 @@ import multer from 'multer';
 import axios from 'axios';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import * as Minio from 'minio';
 
 // Recreate __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize MinIO client
+let minioClient = null;
+if (process.env.MINIO_ENDPOINT) {
+  minioClient = new Minio.Client({
+    endPoint: process.env.MINIO_ENDPOINT,
+    port: parseInt(process.env.MINIO_PORT || '443', 10),
+    useSSL: process.env.MINIO_USE_SSL === 'true',
+    accessKey: process.env.MINIO_ACCESS_KEY || '',
+    secretKey: process.env.MINIO_SECRET_KEY || '',
+    region: process.env.MINIO_REGION || 'abas-ph'
+  });
+  console.log('[MinIO] Client initialized for:', process.env.MINIO_ENDPOINT);
+} else {
+  console.log('[MinIO] Client NOT initialized (MINIO_ENDPOINT missing)');
+}
+
+async function uploadBase64ToMinio(base64Str, filename) {
+  if (!minioClient || !base64Str) return base64Str;
+  try {
+    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return base64Str;
+    }
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const bucketName = process.env.MINIO_BUCKET || 'abas-id-requests';
+    const year = new Date().getFullYear();
+    const objectName = `ids/${year}/${filename}`;
+    
+    const exists = await minioClient.bucketExists(bucketName).catch(() => false);
+    if (!exists) {
+      await minioClient.makeBucket(bucketName, process.env.MINIO_REGION || 'abas-ph');
+      console.log(`[MinIO] Created bucket: ${bucketName}`);
+    }
+
+    await minioClient.putObject(bucketName, objectName, buffer, buffer.length, {
+      'Content-Type': contentType
+    });
+    
+    const publicUrl = `${process.env.MINIO_PUBLIC_URL || `https://${process.env.MINIO_ENDPOINT}`}/${bucketName}/${objectName}`;
+    console.log(`[MinIO] Uploaded ${objectName} successfully: ${publicUrl}`);
+    return publicUrl;
+  } catch (err) {
+    console.error('[MinIO] Upload failed:', err.message);
+    return base64Str;
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -739,15 +788,34 @@ const IDS_FILE = path.join(DATA_PATH, 'saved_ids.json');
 const readSavedIds = () => fs.existsSync(IDS_FILE) ? JSON.parse(fs.readFileSync(IDS_FILE, 'utf8')) : [];
 
 app.get('/api/saved-ids', (req, res) => {
-  res.json(readSavedIds());
+  let data = readSavedIds();
+  if (req.query.empCode) {
+    const code = req.query.empCode.toLowerCase();
+    data = data.filter(e => (e.empCode || '').toLowerCase() === code);
+  }
+  res.json(data);
 });
-app.post('/api/saved-ids', (req, res) => {
+app.post('/api/saved-ids', async (req, res) => {
   const existing = readSavedIds();
-  const newEntry = req.body; // { id, employeeName, empCode, company, frontImg, backImg, savedAt }
+  const newEntry = req.body; // { id, employeeName, empCode, company, frontImg, backImg, savedAt, abasRequestId, abasEmployeeId }
   // Auto-generate hash from empCode if provided
   if (newEntry.empCode && !newEntry.hash) {
     newEntry.hash = hashEmpCode(newEntry.empCode);
   }
+  
+  newEntry.abasRequestId = newEntry.abasRequestId || null;
+  newEntry.abasEmployeeId = newEntry.abasEmployeeId || null;
+
+  // Upload front and back images to MinIO if base64
+  if (newEntry.frontImg && newEntry.frontImg.startsWith('data:')) {
+    const frontFilename = `${newEntry.empCode || newEntry.employeeName}_front.jpg`;
+    newEntry.frontImg = await uploadBase64ToMinio(newEntry.frontImg, frontFilename);
+  }
+  if (newEntry.backImg && newEntry.backImg.startsWith('data:')) {
+    const backFilename = `${newEntry.empCode || newEntry.employeeName}_back.jpg`;
+    newEntry.backImg = await uploadBase64ToMinio(newEntry.backImg, backFilename);
+  }
+
   // Replace if same employee+company already exists
   const updated = [...existing.filter(e => !(e.employeeName === newEntry.employeeName && e.company === newEntry.company)), newEntry];
   fs.writeFileSync(IDS_FILE, JSON.stringify(updated, null, 2));
@@ -799,11 +867,58 @@ app.post('/api/id-requests', (req, res) => {
     statusHistory: [{ status: 'pending', note: 'Request submitted', changedAt: now }],
     createdAt: now,
     updatedAt: now,
+    abasRequestId: req.body.abasRequestId || null,
+    abasEmployeeId: req.body.abasEmployeeId || null,
   };
   requests.unshift(newReq);
   writeRequests(requests);
   console.log(`[ID REQUEST] Created ${newReq.id} for ${newReq.employeeName}`);
   res.status(201).json(newReq);
+});
+
+// POST /api/notify-abas  — called by fluffy frontend when ID is saved & ready
+app.post('/api/notify-abas', express.json(), async (req, res) => {
+  const { abasRequestId, savedIdId } = req.body;
+  if (!abasRequestId || !savedIdId) {
+    return res.status(400).json({ error: 'abasRequestId and savedIdId required' });
+  }
+
+  const ABAS_URL = process.env.ABAS_URL || 'https://abas.avegabros.net';
+  const ABAS_API_KEY = process.env.ABAS_API_KEY || '';
+
+  try {
+    const savedIds = readSavedIds();
+    const entry = savedIds.find(e => String(e.id) === String(savedIdId));
+    if (!entry) return res.status(404).json({ error: 'Saved ID not found' });
+
+    const payload = {
+      abasRequestId,
+      savedIdId: entry.id,
+      empCode: entry.empCode,
+      employeeName: entry.employeeName,
+      frontImgFilename: entry.frontImg ? entry.frontImg.split('/').pop() : null,
+      backImgFilename: entry.backImg ? entry.backImg.split('/').pop() : null,
+      savedAt: entry.savedAt,
+    };
+
+    const response = await axios.post(
+      `${ABAS_URL.replace(/\/$/, '')}/Corporate_Services/id_ready_webhook`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Abas-Api-Key': ABAS_API_KEY,
+        },
+        timeout: 10000,
+      }
+    );
+
+    console.log(`[NOTIFY-ABAS] Notified ABAS for request ${abasRequestId}:`, response.status);
+    res.json({ success: true, status: response.status });
+  } catch (err) {
+    console.error('[NOTIFY-ABAS] Failed to notify ABAS:', err.message);
+    res.status(500).json({ error: 'Failed to notify ABAS', detail: err.message });
+  }
 });
 
 // PATCH update request (fields or status)
