@@ -100,23 +100,46 @@ You can log in to the admin panel with these credentials and manage user account
 │   ├── components/           # Reusable UI components
 │   └── ...                   # Pages, hooks, and application logic
 ├── package.json              # Shared project configurations and dependencies
-├── vite.config.ts            # Vite bundler and API proxy configuration
-└── deploy.ps1                # PowerShell script for automated remote deployment
+└── vite.config.ts            # Vite bundler and API proxy configuration
 ```
 
 ---
 
-## 🛠️ Production Deployment
+## 🛠️ Production Deployment (Portainer Git Stack)
 
-To build and package the frontend for production, run:
+AVPass is deployed using **Portainer** by configuring a **Git Repository Stack**. Portainer automatically pulls the latest `docker-compose.yml` and builds the containers directly from the repository.
 
-```bash
-npm run build
-```
+### Setup in Portainer:
 
-This generates a optimized static output in the `/dist` directory. For automated deployments to production staging servers, you can run the provided PowerShell deploy script (requires configured SSH keys):
+1. **Create a New Stack:**
+   - Go to **Stacks** > **Add stack** in your Portainer dashboard.
+   - Choose **Repository** under the *Build method*.
 
-```powershell
-./deploy.ps1
-```
+2. **Repository Configuration:**
+   - **Repository URL:** `https://github.com/avegabros/AVPass.git`
+   - **Repository reference:** `refs/heads/main` (or your target branch)
+   - **Compose path:** `docker-compose.yml`
+
+3. **Environment Variables:**
+   Add the following variables in the Stack environment configuration screen (copying values from your production configuration):
+   - `JWT_SECRET`
+   - `HASH_SECRET`
+   - `HRIS_URL`
+   - `HRIS_API_KEY`
+   - `HRIS_USERNAME`
+   - `HRIS_PASSWORD`
+   - `ABAS_URL`
+   - `ABAS_API_KEY`
+   - `MINIO_ENDPOINT`
+   - `MINIO_PORT`
+   - `MINIO_USE_SSL`
+   - `MINIO_ACCESS_KEY`
+   - `MINIO_SECRET_KEY`
+   - `MINIO_REGION`
+   - `MINIO_PUBLIC_URL`
+   - `MINIO_BUCKET`
+
+4. **Deploy the Stack:**
+   - Click **Deploy the stack**. Portainer will clone the repository, build both backend and frontend images, map the persistent volume, and expose the services.
+
 
