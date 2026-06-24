@@ -115,4 +115,49 @@ export interface EditingID {
   position: string;
   front: IDSide;
   back: IDSide;
+  requestId?: string;
+  abasRequestId?: number | null;
+  pictureUrl?: string | null;
+  signatureUrl?: string | null;
+}
+
+export type RequestStatus =
+  | 'pending'
+  | 'processing'
+  | 'approved'
+  | 'rejected'
+  | 'id generated'
+  | 'printed'
+  | 'completed'
+  | 'for releasing'
+  | 'claimed'
+  | 'cancelled';
+
+export interface StatusEntry {
+  status: RequestStatus;
+  note: string;
+  changedAt: string;
+}
+
+export interface IDRequest {
+  id: string;
+  employeeName: string;
+  empCode: string;
+  company: string;
+  department: string;
+  position: string;
+  purpose: string;
+  requestedBy: string;
+  status: RequestStatus;
+  statusHistory: StatusEntry[];
+  createdAt: string;
+  updatedAt: string;
+  abasRequestId?: number | null;
+  abasEmployeeId?: number | null;
+  iraafId?: string | null;
+  pictureUrl?: string | null;
+  signatureUrl?: string | null;
+  supportingDocUrl?: string | null;
+  verifierName?: string | null;
+  approverName?: string | null;
 }

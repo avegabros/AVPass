@@ -5,10 +5,11 @@ export function resolveImg(url: string | null | undefined): string | null {
   const u = url.trim();
   if (!u) return null;
   if (u.startsWith('data:')) return u;
-  if (u.startsWith('http://') || u.startsWith('https://')) return u;
-  if (u.startsWith('/')) return u;
-  // Bare filename from HRIS API e.g. "74dcf6a97073c25ef48ac87376c0caa7.jpg"
-  const parts = u.split('/');
+  if (u.startsWith('/images/')) return u;
+  
+  // Extract filename (strip query string and hashes)
+  const cleanUrl = u.split('?')[0].split('#')[0];
+  const parts = cleanUrl.split('/');
   const filename = parts[parts.length - 1];
   return '/images/' + filename;
 }

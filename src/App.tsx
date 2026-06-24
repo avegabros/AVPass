@@ -317,7 +317,17 @@ export default function App() {
             setEditingID(null);
             // Pre-populate the builder search with employee name from the request
             // by using a lightweight editingID with no front/back (fresh canvas)
-            setEditingID({ id: '', employeeName: req.employeeName, position: req.position, front: null as any, back: null as any });
+            setEditingID({
+              id: '',
+              employeeName: req.employeeName,
+              position: req.position,
+              front: null as any,
+              back: null as any,
+              requestId: req.id,
+              abasRequestId: req.abasRequestId,
+              pictureUrl: req.pictureUrl,
+              signatureUrl: req.signatureUrl
+            });
             setActiveSection('idbuilder');
           }} />}
           {activeSection === 'idrecords' && <SavedIDs savedIDs={savedIDs} setSavedIDs={setSavedIDs} onEditInBuilder={entry => { setEditingID({ id: entry.id, employeeName: entry.employeeName, position: entry.position, front: entry.front, back: entry.back }); setActiveSection('idbuilder'); }} />}

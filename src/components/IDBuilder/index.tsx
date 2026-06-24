@@ -2,7 +2,7 @@ import React from 'react';
 import QRCode from 'qrcode';
 import { Download, Loader2, Search, Settings, Image as ImageIcon, Save, Printer, RefreshCw, Undo, Redo, Grid, Magnet, X, MousePointer2, LayoutTemplate, Layers, Pencil, Trash2, ArrowLeft } from 'lucide-react';
 import { API_URL } from '../../types';
-import type { EmployeeRecord, IDField, IDSide, IDTemplate } from '../../types';
+import type { EmployeeRecord, IDField, IDSide, IDTemplate, EditingID } from '../../types';
 import { resolveImg, hexToColorFilter, hexToColorFilterWhite } from '../../utils';
 
 // ── DEFAULT FIELDS ──
@@ -62,8 +62,16 @@ const AccSection = React.memo(({ id, icon, title, open, onToggle, children }: {
 ));
 
 // ── LAYER EDITOR (Properties Panel) ──
-interface LayerEditorProps { layer: 'photo' | 'sig'; side: IDSide; onUpdate: (updates: Partial<IDSide>) => void; }
-const LayerEditor = React.memo(({ layer, side: sd, onUpdate }: LayerEditorProps) => {
+interface LayerEditorProps { 
+  layer: 'photo' | 'sig'; 
+  side: IDSide; 
+  onUpdate: (updates: Partial<IDSide>) => void; 
+  customPhoto: string | null;
+  setCustomPhoto: (url: string | null) => void;
+  customSig: string | null;
+  setCustomSig: (url: string | null) => void;
+}
+const LayerEditor = React.memo(({ layer, side: sd, onUpdate, customPhoto, setCustomPhoto, customSig, setCustomSig }: LayerEditorProps) => {
   const isPhoto = layer === 'photo';
   const accentColor = isPhoto ? '#3b82f6' : '#8b5cf6';
 
@@ -88,8 +96,54 @@ const LayerEditor = React.memo(({ layer, side: sd, onUpdate }: LayerEditorProps)
     </div>
   );
 
+  const customAsset = isPhoto ? customPhoto : customSig;
+  const setCustomAsset = isPhoto ? setCustomPhoto : setCustomSig;
+  const fileInputId = isPhoto ? 'prop-photo-upload' : 'prop-sig-upload';
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomAsset(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:'16px'}}>
+      {panel(isPhoto ? 'Upload / Replace Photo' : 'Upload / Replace Signature',
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <input 
+            type="file" 
+            accept="image/*" 
+            id={fileInputId}
+            onChange={handleFileChange} 
+            style={{ display: 'none' }}
+          />
+          <label 
+            htmlFor={fileInputId}
+            style={{ 
+              flex: 1, padding: '8px 12px', border: `1px dashed ${accentColor}`, borderRadius: '8px', 
+              background: customAsset ? `${accentColor}10` : '#fff', color: accentColor, fontSize: '12px', 
+              fontWeight: 600, cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+              display: 'block'
+            }}>
+            {customAsset ? '✓ File Uploaded (Change)' : `📁 Upload ${isPhoto ? 'Photo' : 'Signature'}`}
+          </label>
+          {customAsset && (
+            <button 
+              onClick={() => setCustomAsset(null)} 
+              style={{ 
+                padding: '8px 12px', border: '1px solid #fca5a5', background: '#fef2f2', 
+                color: '#ef4444', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' 
+              }}>
+              Reset
+            </button>
+          )}
+        </div>
+      )}
       {panel('Position & Size',
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
           {(isPhoto?[{l:'X %',k:'photoX',v:sd.photoX},{l:'Y %',k:'photoY',v:sd.photoY},{l:'Width %',k:'photoW',v:sd.photoW},{l:'Height %',k:'photoH',v:sd.photoH}]:[{l:'X %',k:'sigX',v:sd.sigX},{l:'Y %',k:'sigY',v:sd.sigY},{l:'Width %',k:'sigW',v:sd.sigW},{l:'Height %',k:'sigH',v:sd.sigH}]).map(({l,k,v})=>(
@@ -297,7 +351,7 @@ const FieldEditor = React.memo(({ field, onUpdate }: FieldEditorProps) => {
 // ── MAIN ID BUILDER COMPONENT ──
 interface IDBuilderProps {
   records?: EmployeeRecord[]; // kept for backwards compat — employee search now uses API
-  editingID?: { id: string; employeeName: string; position: string; front: IDSide; back: IDSide } | null;
+  editingID?: EditingID | null;
   onEditSaved?: (id: string) => void;
   pendingTemplate?: IDTemplate | null;
   onTemplatLoaded?: () => void;
@@ -308,6 +362,8 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
 
   // ── core state ──
   const [activeSide, setActiveSide] = React.useState<'front'|'back'>('front');
+  const [customPhoto, setCustomPhoto] = React.useState<string|null>(null);
+  const [customSig, setCustomSig] = React.useState<string|null>(null);
   const getMobileZoom = () => {
     if (typeof window === 'undefined') return 1.0;
     if (window.innerWidth < 768) {
@@ -375,24 +431,61 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
     }, 350);
   }, []);
 
+  const getInitialFront = (): IDSide => {
+    if (editingID) {
+      if (editingID.front) return editingID.front;
+      const fields = defaultFrontFields.map(f => {
+        if (f.id === 'fullname') return { ...f, value: editingID.employeeName };
+        if (f.id === 'nickname') {
+          const commaIdx = editingID.employeeName.indexOf(',');
+          let firstName = editingID.employeeName;
+          if (commaIdx !== -1) {
+            const afterComma = editingID.employeeName.slice(commaIdx + 1).trim();
+            firstName = afterComma.split(' ')[0] || afterComma;
+          }
+          return { ...f, value: firstName };
+        }
+        if (f.id === 'position') return { ...f, value: editingID.position || '' };
+        return f;
+      });
+      return {
+        background: null, fields,
+        photoX: 50, photoY: 49, photoW: 70, photoH: 50, showPhoto: true,
+        sigX: 35, sigY: 86, sigW: 40, sigH: 8, showSig: true,
+      };
+    }
+    return {
+      background: null, fields: defaultFrontFields,
+      photoX: 50, photoY: 49, photoW: 70, photoH: 50, showPhoto: true,
+      sigX: 35, sigY: 86, sigW: 40, sigH: 8, showSig: true,
+    };
+  };
+
+  const getInitialBack = (): IDSide => {
+    if (editingID) {
+      if (editingID.back) return editingID.back;
+      return {
+        background: null, fields: defaultBackFields,
+        photoX: 50, photoY: 49, photoW: 70, photoH: 50, showPhoto: false,
+        sigX: 35, sigY: 86, sigW: 40, sigH: 8, showSig: false,
+        showQR: true, qrX: 50, qrY: 42, qrSize: 70,
+        qrUrl: 'https://employee.abas.ph/verify/',
+        qrFg: '#000000', qrBg: '#ffffff',
+      };
+    }
+    return {
+      background: null, fields: defaultBackFields,
+      photoX: 50, photoY: 49, photoW: 70, photoH: 50, showPhoto: false,
+      sigX: 35, sigY: 86, sigW: 40, sigH: 8, showSig: false,
+      showQR: true, qrX: 50, qrY: 42, qrSize: 70,
+      qrUrl: 'https://employee.abas.ph/verify/',
+      qrFg: '#000000', qrBg: '#ffffff',
+    };
+  };
+
   // ── card data ──
-  const [front, setFront] = React.useState<IDSide>(
-    editingID?.front ?? {
-      background:null, fields: defaultFrontFields,
-      photoX:50, photoY:49, photoW:70, photoH:50, showPhoto:true,
-      sigX:35,   sigY:86,  sigW:40,  sigH:8,   showSig:true,
-    }
-  );
-  const [back, setBack] = React.useState<IDSide>(
-    editingID?.back ?? {
-      background:null, fields: defaultBackFields,
-      photoX:50, photoY:49, photoW:70, photoH:50, showPhoto:false,
-      sigX:35,   sigY:86,  sigW:40,  sigH:8,   showSig:false,
-      showQR:true, qrX:50, qrY:42, qrSize:70,
-      qrUrl:'https://employee.abas.ph/verify/',
-      qrFg:'#000000', qrBg:'#ffffff',
-    }
-  );
+  const [front, setFront] = React.useState<IDSide>(getInitialFront);
+  const [back, setBack] = React.useState<IDSide>(getInitialBack);
   // Pre-fill employee name from editingID
   const [_editingIDRef] = React.useState(editingID);
 
@@ -544,6 +637,8 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
 
   const autoFill = (emp:EmployeeRecord) => {
     setSelectedEmployee(emp); setEmpSearch(emp.name); setShowEmpDrop(false);
+    setCustomPhoto(null);
+    setCustomSig(null);
     if(empSearchRef.current) empSearchRef.current.value = emp.name;
     // Fill front card fields
     setFront(p=>({...p, fields:p.fields.map(f=>{
@@ -575,8 +670,34 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
   };
 
 
-  const employeePhoto = selectedEmployee?.photo ? resolveImg(selectedEmployee.photo) : null;
-  const employeeSig   = selectedEmployee?.signature ? resolveImg(selectedEmployee.signature) : null;
+  const employeePhoto = customPhoto || (selectedEmployee?.photo 
+    ? resolveImg(selectedEmployee.photo) 
+    : (editingID?.pictureUrl ? resolveImg(editingID.pictureUrl) : null));
+  const employeeSig   = customSig || (selectedEmployee?.signature 
+    ? resolveImg(selectedEmployee.signature) 
+    : (editingID?.signatureUrl ? resolveImg(editingID.signatureUrl) : null));
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSigUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomSig(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleFieldMouseDown = (e:React.MouseEvent, fieldId:string) => {
     if (isMobile) setMobileTab('props');
@@ -902,32 +1023,116 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
     a.click();
   };
 
+  const toBase64 = async (url: string): Promise<string | null> => {
+    if (!url) return null;
+    if (url.startsWith('data:')) return url;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
   const saveIDToServer = async()=>{
     if(!selectedEmployee&&!editingID) return;
     setSavingID(true);
     // Capture both sides - use renderSide (canvas renderer) for saving
     // html2canvas only captures visible elements; renderSide works for both
     const [fi, bi] = await Promise.all([renderSide('front'), renderSide('back')]);
+    
+    // Convert avatar and signature to base64 to save them to MinIO
+    const [avatarB64, sigB64] = await Promise.all([
+      employeePhoto ? toBase64(employeePhoto) : Promise.resolve(null),
+      employeeSig ? toBase64(employeeSig) : Promise.resolve(null)
+    ]);
+
     const name    = selectedEmployee?.name     || editingID?.employeeName || '';
     const pos     = selectedEmployee?.position || editingID?.position     || '';
     const empCode = selectedEmployee?.empCode  || '';
     const company = (selectedEmployee as any)?.company || front.fields.find(f=>f.id==='company')?.value || '';
+    const abasReqId = editingID?.abasRequestId || null;
+    const abasEmpId = selectedEmployee?.id || (editingID as any)?.abasEmployeeId || null;
+
     try{
+      const payload = {
+        employeeName: name,
+        position: pos,
+        empCode,
+        company,
+        frontImg: fi,
+        backImg: bi,
+        avatarImg: avatarB64,
+        signatureImg: sigB64,
+        savedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        abasRequestId: abasReqId,
+        abasEmployeeId: abasEmpId
+      };
+
+      let savedIdId = '';
+      let saveOk = false;
+
       if(editingID && editingID.id){
         // Update existing saved ID
-        const res=await fetch(`${API_URL}/saved-ids/${editingID.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({employeeName:name,position:pos,empCode,company,frontImg:fi,backImg:bi,savedAt:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})})});
-        if(res.ok){ setMsg({type:'success',text:`ID updated for ${name}`}); if(onEditSaved) onEditSaved(editingID.id); }
-        else setMsg({type:'error',text:'Failed to update ID'});
+        savedIdId = editingID.id;
+        const res = await fetch(`${API_URL}/saved-ids/${editingID.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        saveOk = res.ok;
       } else {
         // Save new ID
-        const res=await fetch(`${API_URL}/saved-ids`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:`${selectedEmployee!.id}-${Date.now()}`,employeeName:name,position:pos,empCode,company,frontImg:fi,backImg:bi,savedAt:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})})});
-        if(res.ok) setMsg({type:'success',text:`ID saved for ${name}`});
-        else setMsg({type:'error',text:'Failed to save ID'});
+        savedIdId = `${selectedEmployee?.id || Date.now()}-${Date.now()}`;
+        const res = await fetch(`${API_URL}/saved-ids`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: savedIdId, ...payload })
+        });
+        saveOk = res.ok;
       }
-    }catch{ setMsg({type:'error',text:'Connection error'}); }
+
+      if (saveOk) {
+        setMsg({ type: 'success', text: `ID saved for ${name}` });
+
+        // If this ID is linked to a request, update the request status to 'id generated'
+        if (editingID?.requestId) {
+          try {
+            // Update request status in AVPass to 'id generated'
+            const patchRes = await fetch(`${API_URL}/id-requests/${editingID.requestId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'id generated', note: 'ID generated by builder.' })
+            });
+
+            if (patchRes.ok) {
+              // Notify ABAS webhook that ID is ready
+              await fetch(`${API_URL}/notify-abas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  abasRequestId: abasReqId,
+                  savedIdId: savedIdId,
+                })
+              });
+            }
+          } catch (patchErr) {
+            console.error('Failed to update request status:', patchErr);
+          }
+        }
+
+        if (editingID && onEditSaved) onEditSaved(savedIdId);
+      } else {
+        setMsg({ type: 'error', text: 'Failed to save ID' });
+      }
+    } catch { setMsg({ type: 'error', text: 'Connection error' }); }
     setSavingID(false);
-    setTimeout(()=>setMsg(null),3000);
+    setTimeout(() => setMsg(null), 3000);
   };
 
   const loadTemplate = (t:IDTemplate)=>{ setConfirmLoad(t); };
@@ -1111,9 +1316,30 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
             <div>
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                 <div style={{fontSize:'15px',fontWeight:800,color:'#0f172a',lineHeight:1.1}}>ID Studio</div>
-                {editingID&&<span style={{background:'#f59e0b22',color:'#d97706',fontSize:'9px',fontWeight:800,padding:'2px 8px',borderRadius:'20px',border:'1px solid #f59e0b44',letterSpacing:'0.5px'}}>✏ EDITING</span>}
+                {editingID && (
+                  <span style={{
+                    background: editingID.requestId ? '#eff6ff' : '#f59e0b22',
+                    color: editingID.requestId ? '#2563eb' : '#d97706',
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    border: `1px solid ${editingID.requestId ? '#bfdbfe' : '#f59e0b44'}`,
+                    letterSpacing: '0.5px'
+                  }}>
+                    {editingID.requestId ? '📋 REQUEST LINKED' : '✏ EDITING'}
+                  </span>
+                )}
               </div>
-              <div style={{fontSize:'11px',color:'#94a3b8',fontWeight:500}}>{editingID?`Editing: ${editingID.employeeName}`:'Design & Export'}</div>
+              <div style={{fontSize:'11px',color:'#94a3b8',fontWeight:500}}>
+                {editingID ? (
+                  <>
+                    Editing: <strong>{editingID.employeeName}</strong>
+                    {editingID.requestId && ` · Request ID: ${editingID.requestId}`}
+                    {editingID.abasRequestId && ` · ABAS Ticket ID: ${editingID.abasRequestId}`}
+                  </>
+                ) : 'Design & Export'}
+              </div>
             </div>
           </div>
           {!isMobile && <div style={{width:'1px',height:'28px',background:'#e2e8f0'}}></div>}
@@ -1183,6 +1409,15 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
           </div>
           <div style={{flex:1,overflowY:'auto'}}>
             <AccSection id="employee" icon={<Search size={16}/>} title="Employee Link" open={openSection==="employee"} onToggle={toggleSection}>
+              {editingID?.requestId && (
+                <div style={{ padding: '10px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', fontSize: '12px', color: '#1e40af', marginBottom: '12px', lineHeight: 1.4 }}>
+                  <div style={{ fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>📋</span> Linked to Request
+                  </div>
+                  <div><strong>Request ID:</strong> {editingID.requestId}</div>
+                  {editingID.abasRequestId && <div><strong>ABAS Ticket ID:</strong> {editingID.abasRequestId}</div>}
+                </div>
+              )}
               <div style={{position:'relative'}}>
                 <div style={{position:'relative'}}>
                   <input type="text" value={empSearch} placeholder="Search employee name..." ref={empSearchRef}
@@ -1228,6 +1463,81 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
                         <span style={{background:'#eff6ff',color:'#2563eb',borderRadius:'4px',padding:'2px 7px',fontSize:'10px',fontWeight:600}}>{(selectedEmployee as any).company}</span>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {(selectedEmployee || editingID) && (
+                <div style={{ marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                    Upload Custom Assets
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Custom ID Photo</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          id="custom-photo-upload"
+                          onChange={handlePhotoUpload} 
+                          style={{ display: 'none' }}
+                        />
+                        <label 
+                          htmlFor="custom-photo-upload"
+                          style={{ 
+                            flex: 1, padding: '8px 12px', border: '1px dashed #667eea', borderRadius: '8px', 
+                            background: customPhoto ? '#f5f3ff' : '#fff', color: '#667eea', fontSize: '12px', 
+                            fontWeight: 600, cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                            display: 'block'
+                          }}>
+                          {customPhoto ? '✓ Photo Uploaded (Change)' : '📁 Upload Photo'}
+                        </label>
+                        {customPhoto && (
+                          <button 
+                            onClick={() => setCustomPhoto(null)} 
+                            style={{ 
+                              padding: '8px 12px', border: '1px solid #fca5a5', background: '#fef2f2', 
+                              color: '#ef4444', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' 
+                            }}>
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Custom Signature</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          id="custom-sig-upload"
+                          onChange={handleSigUpload} 
+                          style={{ display: 'none' }}
+                        />
+                        <label 
+                          htmlFor="custom-sig-upload"
+                          style={{ 
+                            flex: 1, padding: '8px 12px', border: '1px dashed #8b5cf6', borderRadius: '8px', 
+                            background: customSig ? '#f5f3ff' : '#fff', color: '#8b5cf6', fontSize: '12px', 
+                            fontWeight: 600, cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                            display: 'block'
+                          }}>
+                          {customSig ? '✓ Signature Uploaded (Change)' : '📁 Upload Signature'}
+                        </label>
+                        {customSig && (
+                          <button 
+                            onClick={() => setCustomSig(null)} 
+                            style={{ 
+                              padding: '8px 12px', border: '1px solid #fca5a5', background: '#fef2f2', 
+                              color: '#ef4444', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' 
+                            }}>
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1414,7 +1724,15 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
           {/* Properties Content */}
           <div style={{flex:1,overflowY:'auto'}}>
             {selectedLayer ? (
-              <LayerEditor layer={selectedLayer} side={side} onUpdate={updateSideProps}/>
+              <LayerEditor 
+                layer={selectedLayer} 
+                side={side} 
+                onUpdate={updateSideProps}
+                customPhoto={customPhoto}
+                setCustomPhoto={setCustomPhoto}
+                customSig={customSig}
+                setCustomSig={setCustomSig}
+              />
             ) : selectedField ? (
               <FieldEditor field={selectedField} onUpdate={updateField}/>
             ) : (

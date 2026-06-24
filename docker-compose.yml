@@ -2,19 +2,39 @@ version: '3.8'
 
 services:
   employee-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     image: ghcr.io/avegabros/avpass-backend:latest
     container_name: employee-backend
     ports:
       - "3000:5000"
     environment:
       - PORT=5000
-    env_file:
-      - .env
+      - JWT_SECRET=${JWT_SECRET}
+      - HASH_SECRET=${HASH_SECRET}
+      - HRIS_URL=${HRIS_URL:-https://api.avegabros.org/website/auth-login}
+      - HRIS_API_KEY=${HRIS_API_KEY}
+      - HRIS_USERNAME=${HRIS_USERNAME}
+      - HRIS_PASSWORD=${HRIS_PASSWORD}
+      - ABAS_URL=${ABAS_URL:-https://abas.avegabros.net}
+      - ABAS_API_KEY=${ABAS_API_KEY}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio-api.abas.ph}
+      - MINIO_PORT=${MINIO_PORT:-443}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-true}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_REGION=${MINIO_REGION:-abas-ph}
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-https://minio-api.abas.ph}
+      - MINIO_BUCKET=${MINIO_BUCKET:-company-id}
     volumes:
       - backend-data:/app/backend/data
     restart: unless-stopped
 
   employee-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     image: ghcr.io/avegabros/avpass-frontend:latest
     container_name: employee-frontend
     ports:
