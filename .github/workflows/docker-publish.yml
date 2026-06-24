@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE_NAME: avegabros/avpass-backend
-  FRONTEND_IMAGE_NAME: avegabros/avpass-frontend
+  BACKEND_IMAGE_NAME: ${{ github.repository_owner }}/avpass-backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository_owner }}/avpass-frontend
 
 jobs:
   build-and-push:
