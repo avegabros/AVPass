@@ -462,16 +462,20 @@ app.get('/api/employees', async (req, res) => {
           timeout: 15000,
       });
 
+      const rawData = response.data;
+      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
+        rawData.total = rawData.count;
+      }
+
       // If company filter provided, filter client-side
       if (company && typeof company === 'string' && company.trim()) {
         const companyLower = company.trim().toLowerCase();
-        const rawData = response.data;
         const list = Array.isArray(rawData) ? rawData : (rawData?.data ?? []);
         const filtered = list.filter(e => (e.company || '').toLowerCase().includes(companyLower));
         return Array.isArray(rawData) ? filtered : { ...rawData, data: filtered, total: filtered.length };
       }
 
-      return response.data;
+      return rawData;
   };
 
   try {
