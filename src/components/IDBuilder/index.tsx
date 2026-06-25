@@ -469,7 +469,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
         photoX: 50, photoY: 49, photoW: 70, photoH: 50, showPhoto: false,
         sigX: 35, sigY: 86, sigW: 40, sigH: 8, showSig: false,
         showQR: true, qrX: 50, qrY: 42, qrSize: 70,
-        qrUrl: 'https://employee.abas.ph/verify/',
+        qrUrl: 'https://avpass.abas.ph/verify/',
         qrFg: '#000000', qrBg: '#ffffff',
       };
     }
@@ -478,7 +478,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
       photoX: 50, photoY: 49, photoW: 70, photoH: 50, showPhoto: false,
       sigX: 35, sigY: 86, sigW: 40, sigH: 8, showSig: false,
       showQR: true, qrX: 50, qrY: 42, qrSize: 70,
-      qrUrl: 'https://employee.abas.ph/verify/',
+      qrUrl: 'https://avpass.abas.ph/verify/',
       qrFg: '#000000', qrBg: '#ffffff',
     };
   };
@@ -582,7 +582,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
   React.useEffect(() => {
     const empCode = selectedEmployee?.empCode || '';
     selectedEmpCode.current = empCode;
-    generateQR(empCode, back.qrUrl || 'https://employee.abas.ph/verify/', back.qrFg || '#000000', back.qrBg || '#ffffff');
+    generateQR(empCode, back.qrUrl || 'https://avpass.abas.ph/verify/', back.qrFg || '#000000', back.qrBg || '#ffffff');
   }, [selectedEmployee, back.qrUrl, back.qrFg, back.qrBg, generateQR]);
 
   const [flipFace,  setFlipFace]  = React.useState<'front'|'back'>('front');
@@ -1574,7 +1574,7 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
                       <div>
                         <label style={{fontSize:'11px',color:'#64748b',fontWeight:500,display:'block',marginBottom:'4px'}}>Verify URL</label>
                         <input type="text" value={back.qrUrl||''} onChange={e=>setBack(p=>({...p,qrUrl:e.target.value}))}
-                          placeholder="https://employee.abas.ph/verify/"
+                          placeholder="https://avpass.abas.ph/verify/"
                           style={{width:'100%',background:'#fff',border:'1px solid #e2e8f0',borderRadius:'6px',padding:'6px 8px',fontSize:'11px',color:'#0f172a',outline:'none',boxSizing:'border-box'}}/>
                         <p style={{margin:'3px 0 0',fontSize:'10px',color:'#94a3b8'}}>Employee ID will be appended automatically</p>
                       </div>

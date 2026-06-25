@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    image: ghcr.io/tildemark/avpass-backend:feature-abas-integration
+    image: ghcr.io/avegabros/avpass-backend:latest
     container_name: avpass-backend
     ports:
       - "3000:5000"
@@ -35,7 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    image: ghcr.io/tildemark/avpass-frontend:feature-abas-integration
+    image: ghcr.io/avegabros/avpass-frontend:latest
     container_name: avpass-frontend
     ports:
       - "8001:8001"
