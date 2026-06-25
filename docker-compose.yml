@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  employee-backend:
+  avpass-backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    image: ghcr.io/avegabros/avpass-backend:latest
-    container_name: employee-backend
+    image: ghcr.io/tildemark/avpass-backend:feature-abas-integration
+    container_name: avpass-backend
     ports:
       - "3000:5000"
     environment:
@@ -31,16 +31,16 @@ services:
       - backend-data:/app/backend/data
     restart: unless-stopped
 
-  employee-frontend:
+  avpass-frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    image: ghcr.io/avegabros/avpass-frontend:latest
-    container_name: employee-frontend
+    image: ghcr.io/tildemark/avpass-frontend:feature-abas-integration
+    container_name: avpass-frontend
     ports:
       - "8001:8001"
     depends_on:
-      - employee-backend
+      - avpass-backend
     restart: unless-stopped
 
 volumes:
