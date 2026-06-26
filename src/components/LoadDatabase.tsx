@@ -46,7 +46,7 @@ export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps)
       const data = await res.json();
       const rawList: ApiEmployee[] = Array.isArray(data) ? data : (data.data ?? []);
       setEmployees(rawList);
-      setTotalCount(data.total ?? rawList.length);
+      setTotalCount(data.total ?? data.count ?? rawList.length);
       if (setEmployeeDatabase) setEmployeeDatabase(rawList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
