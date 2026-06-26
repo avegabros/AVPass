@@ -46,7 +46,7 @@ export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps)
       const data = await res.json();
       const rawList: ApiEmployee[] = Array.isArray(data) ? data : (data.data ?? []);
       setEmployees(rawList);
-      setTotalCount(data.total ?? rawList.length);
+      setTotalCount(data.total ?? data.count ?? rawList.length);
       if (setEmployeeDatabase) setEmployeeDatabase(rawList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -153,8 +153,24 @@ export default function LoadDatabase({ setEmployeeDatabase }: LoadDatabaseProps)
                     </td>
                     <td style={td}>{emp.emergency_contact_num ? <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{emp.emergency_contact_num}</span> : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>}</td>
                     <td style={{ ...td, color: "#64748b", fontSize: "12px" }}>{emp.emergency_contact_person || <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>}</td>
-                    <td style={td}>{emp.picture ? <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px" }}>✓ Yes</span> : <span style={{ background: "#f8fafc", color: "#cbd5e1", fontSize: "10px", padding: "2px 8px", borderRadius: "20px" }}>—</span>}</td>
-                    <td style={td}>{emp.signature ? <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px" }}>✓ Yes</span> : <span style={{ background: "#f8fafc", color: "#cbd5e1", fontSize: "10px", padding: "2px 8px", borderRadius: "20px" }}>—</span>}</td>
+                    <td style={td}>
+                      {emp.picture ? (
+                        <a href={emp.picture} target="_blank" rel="noopener noreferrer" style={{ background: "#ecfdf5", color: "#059669", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", textDecoration: "none" }}>
+                          ✓ Yes
+                        </a>
+                      ) : (
+                        <span style={{ background: "#f8fafc", color: "#cbd5e1", fontSize: "10px", padding: "2px 8px", borderRadius: "20px" }}>—</span>
+                      )}
+                    </td>
+                    <td style={td}>
+                      {emp.signature ? (
+                        <a href={emp.signature} target="_blank" rel="noopener noreferrer" style={{ background: "#ecfdf5", color: "#059669", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", textDecoration: "none" }}>
+                          ✓ Yes
+                        </a>
+                      ) : (
+                        <span style={{ background: "#f8fafc", color: "#cbd5e1", fontSize: "10px", padding: "2px 8px", borderRadius: "20px" }}>—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

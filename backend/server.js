@@ -462,16 +462,20 @@ app.get('/api/employees', async (req, res) => {
           timeout: 15000,
       });
 
+      const rawData = response.data;
+      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
+        rawData.total = rawData.count;
+      }
+
       // If company filter provided, filter client-side
       if (company && typeof company === 'string' && company.trim()) {
         const companyLower = company.trim().toLowerCase();
-        const rawData = response.data;
         const list = Array.isArray(rawData) ? rawData : (rawData?.data ?? []);
         const filtered = list.filter(e => (e.company || '').toLowerCase().includes(companyLower));
         return Array.isArray(rawData) ? filtered : { ...rawData, data: filtered, total: filtered.length };
       }
 
-      return response.data;
+      return rawData;
   };
 
   try {
@@ -615,24 +619,7 @@ app.get('/api/verify/:token', async (req, res) => {
 
 // ── Company Logo ──
 app.get('/api/company-logo', (req, res) => {
-  const exts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
-  const searchDirs = [
-    path.join(DATA_PATH, 'images'),                      // backend/data/images/ (local dev)
-    path.join(__dirname, '..', 'data', 'images'),         // ../data/images/ (production)
-    path.join(__dirname, '..', '..', 'data', 'images'),   // ../../data/images/ (docker volume)
-  ];
-  console.log('[LOGO] searching in:', searchDirs);
-  for (const dir of searchDirs) {
-    for (const ext of exts) {
-      const filePath = path.join(dir, `company-logo.${ext}`);
-      if (fs.existsSync(filePath)) {
-        console.log('[LOGO] found at:', filePath);
-        return res.sendFile(filePath);
-      }
-    }
-  }
-  console.log('[LOGO] not found in any location');
-  res.status(404).send('No logo');
+  res.redirect('https://minio-api.abas.ph/company-logo/av.png');
 });
 
 // ── Verification Page (served at /verify/:token) ──
@@ -688,7 +675,7 @@ app.get('/verify/:token', (req, res) => {
 <body>
   <div class="card" id="card">
     <div class="logo" id="logo-wrap">
-      <img src="/api/company-logo" id="company-logo-img" alt="" style="max-width:80px;max-height:80px;object-fit:contain;border-radius:8px"/>
+      <img src="https://minio-api.abas.ph/company-logo/av.png" id="company-logo-img" alt="" style="max-width:80px;max-height:80px;object-fit:contain;border-radius:8px"/>
       <div id="logo-fallback" class="logo-fallback" style="display:none">🛡</div>
     </div>
     <div class="brand">AVPass ID Verification</div>
@@ -710,7 +697,8 @@ app.get('/verify/:token', (req, res) => {
       var wrap = document.createElement('div');
       wrap.className = 'logo';
       var img = document.createElement('img');
-      img.src = '/api/company-logo';
+      img.id = 'company-logo-img';
+      img.src = 'https://minio-api.abas.ph/company-logo/av.png';
       img.style.cssText = 'max-width:80px;max-height:80px;object-fit:contain;border-radius:8px';
       var fb = document.createElement('div');
       fb.className = 'logo-fallback';
@@ -768,7 +756,7 @@ app.get('/verify/:token', (req, res) => {
         );
 
         // Re-attach logo fallback handler after innerHTML reset
-        var newLogoImg = card.querySelector('img[src="/api/company-logo"]');
+        var newLogoImg = card.querySelector('img[id="company-logo-img"]');
         var newFb = card.querySelector('.logo-fallback');
         if (newLogoImg && newFb) {
           newLogoImg.onerror = function() { newLogoImg.style.display = 'none'; newFb.style.display = 'flex'; };
