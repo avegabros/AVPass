@@ -622,7 +622,7 @@ export default function IDRequests({ currentUser, onGoToBuilder }: Props) {
               )}
 
               {/* Mark as Done & Notify ABAS Button */}
-              {isAdmin && selectedReq.status === 'approved' && selectedReq.abasRequestId && matchingSavedId && (
+              {isAdmin && (selectedReq.status === 'approved' || selectedReq.status === 'processing') && selectedReq.abasRequestId && matchingSavedId && (
                 <div style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', border: '1px solid #6ee7b7', borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
                   <p style={{ margin: '0 0 8px', fontSize: '13px', fontWeight: 700, color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <CheckCircle size={15} color="#059669" /> ID card ready for ABAS
@@ -677,7 +677,7 @@ export default function IDRequests({ currentUser, onGoToBuilder }: Props) {
               </div>
 
               {/* Admin: Proceed to ID Builder when approved */}
-              {isAdmin && selectedReq.status === 'approved' && (
+              {isAdmin && (selectedReq.status === 'approved' || selectedReq.status === 'processing') && (
                 <div style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', border: '1px solid #6ee7b7', borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <CheckCircle size={16} color="#059669" />
