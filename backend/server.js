@@ -1076,6 +1076,18 @@ app.post('/api/id-requests', (req, res) => {
   res.status(201).json(newReq);
 });
 
+// Helper to determine the correct ABAS URL fallback
+function getAbasUrl(req) {
+  if (process.env.ABAS_URL) {
+    return process.env.ABAS_URL;
+  }
+  const host = req?.headers?.host || '';
+  if (host.includes('staging') || host.includes('dev') || process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'development') {
+    return 'https://abas-staging.avegabros.net';
+  }
+  return 'https://abas.avegabros.org';
+}
+
 // POST /api/notify-abas  — called by fluffy frontend when ID is saved & ready
 app.post('/api/notify-abas', express.json(), async (req, res) => {
   const { abasRequestId, savedIdId } = req.body;
@@ -1083,7 +1095,7 @@ app.post('/api/notify-abas', express.json(), async (req, res) => {
     return res.status(400).json({ error: 'abasRequestId and savedIdId required' });
   }
 
-  const ABAS_URL = process.env.ABAS_URL || 'https://abas.avegabros.net';
+  const ABAS_URL = getAbasUrl(req);
   const ABAS_API_KEY = process.env.ABAS_API_KEY || '';
 
   try {
@@ -1123,7 +1135,7 @@ app.post('/api/notify-abas', express.json(), async (req, res) => {
 
 // GET /api/test-abas-connection — Test connection to ABAS webhook
 app.get('/api/test-abas-connection', async (req, res) => {
-  const ABAS_URL = process.env.ABAS_URL || 'https://abas.avegabros.net';
+  const ABAS_URL = getAbasUrl(req);
   const ABAS_API_KEY = process.env.ABAS_API_KEY || '';
 
   try {
@@ -1145,9 +1157,9 @@ app.get('/api/test-abas-connection', async (req, res) => {
 });
 
 // Webhook helper to notify ABAS of status changes
-async function notifyAbasOfStatus(abasRequestId, status, details = {}) {
+async function notifyAbasOfStatus(abasRequestId, status, details = {}, req = null) {
   if (!abasRequestId) return;
-  const ABAS_URL = process.env.ABAS_URL || 'https://abas.avegabros.net';
+  const ABAS_URL = getAbasUrl(req);
   const ABAS_API_KEY = process.env.ABAS_API_KEY || '';
 
   try {
@@ -1177,10 +1189,60 @@ async function notifyAbasOfStatus(abasRequestId, status, details = {}) {
 }
 
 // POST update request status by abasRequestId (called by ABAS sync)
-app.post('/api/id-requests/abas/:abasRequestId', express.json(), (req, res) => {
+app.post('/api/id-requests/abas/:abasRequestId', express.json(), async (req, res) => {
   const requests = readRequests();
   const abasId = req.params.abasRequestId;
-  const idx = requests.findIndex(r => r.abasRequestId && String(r.abasRequestId) === String(abasId));
+  let idx = requests.findIndex(r => r.abasRequestId && String(r.abasRequestId) === String(abasId));
+  
+  if (idx === -1) {
+    const ABAS_URL = getAbasUrl(req);
+    const ABAS_API_KEY = process.env.ABAS_API_KEY || '';
+    try {
+      console.log(`[ID REQUEST Sync] Request not found locally. Fetching request ${abasId} from ABAS...`);
+      const response = await axios.get(
+        `${ABAS_URL.replace(/\/$/, '')}/Corporate_Services/get_id_request_api/${abasId}`,
+        {
+          headers: {
+            'X-Abas-Api-Key': ABAS_API_KEY,
+          },
+          timeout: 8000,
+        }
+      );
+      
+      if (response.data && response.data.id) {
+        const now = new Date().toISOString();
+        const newReq = {
+          id: `REQ-${Date.now()}`,
+          employeeName: response.data.employeeName || '',
+          empCode:      response.data.empCode      || '',
+          company:      response.data.company      || '',
+          department:   response.data.department   || '',
+          position:     response.data.position     || '',
+          purpose:      response.data.purpose      || '',
+          requestedBy:  response.data.requestedBy  || 'ABAS-HR',
+          status:       response.data.status       || 'pending',
+          statusHistory: [{ status: response.data.status || 'pending', note: 'Synced from ABAS', changedAt: now }],
+          createdAt:    now,
+          updatedAt:    now,
+          abasRequestId: response.data.abasRequestId || null,
+          abasEmployeeId: response.data.abasEmployeeId || null,
+          iraafId:       response.data.iraafId       || null,
+          pictureUrl:    response.data.pictureUrl    || null,
+          signatureUrl:  response.data.signatureUrl  || null,
+          supportingDocUrl: response.data.supportingDocUrl || null,
+          verifierName:  response.data.verifierName  || null,
+          approverName:  response.data.approverName  || null,
+        };
+        requests.unshift(newReq);
+        writeRequests(requests);
+        console.log(`[ID REQUEST Sync] Successfully fetched and created request ${newReq.id} for ${newReq.employeeName}`);
+        idx = 0;
+      }
+    } catch (err) {
+      console.error(`[ID REQUEST Sync] Failed to fetch request from ABAS:`, err.message);
+    }
+  }
+
   if (idx === -1) return res.status(404).json({ error: 'Request not found' });
 
   const existing = requests[idx];
@@ -1240,7 +1302,7 @@ app.patch('/api/id-requests/:id', async (req, res) => {
         empCode: updated.empCode,
         iraafId: updated.iraafId,
         note: note || ''
-      });
+      }, req);
     }
   }
 
