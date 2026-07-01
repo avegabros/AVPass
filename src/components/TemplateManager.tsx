@@ -534,7 +534,7 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
     photoX: 50, photoY: 48, photoW: 70, photoH: 50, showPhoto: false,
     sigX: 35, sigY: 85, sigW: 40, sigH: 8, showSig: false,
     showQR: true, qrX: 50, qrY: 42, qrSize: 70,
-    qrUrl: 'https://employee.abas.ph/verify/',
+    qrUrl: 'https://avpass.abas.ph/verify/',
     qrFg: '#000000', qrBg: '#ffffff',
   }));
 
