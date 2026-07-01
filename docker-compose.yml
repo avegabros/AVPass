@@ -17,7 +17,7 @@ services:
       - HRIS_API_KEY=${HRIS_API_KEY}
       - HRIS_USERNAME=${HRIS_USERNAME}
       - HRIS_PASSWORD=${HRIS_PASSWORD}
-      - ABAS_URL=${ABAS_URL:-https://abas.avegabros.net}
+      - ABAS_URL=${ABAS_URL}
       - ABAS_API_KEY=${ABAS_API_KEY}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio-api.abas.ph}
       - MINIO_PORT=${MINIO_PORT:-443}
