@@ -4,7 +4,7 @@ import type { IDRequest, RequestStatus } from '../types';
 import {
   ClipboardList, Plus, X, ChevronDown, Clock, CheckCircle, XCircle,
   Loader, PackageCheck, Search, Trash2, RefreshCw, ChevronRight, User,
-  Pencil, Wand2, Printer
+  Pencil, Wand2, Printer, AlertTriangle
 } from 'lucide-react';
 
 interface Props {
@@ -117,7 +117,7 @@ export default function IDRequests({ currentUser, onGoToBuilder }: Props) {
     if (!selectedReq?.empCode) { setMatchingSavedId(null); return; }
     fetch(`${API_URL}/saved-ids?empCode=${encodeURIComponent(selectedReq.empCode)}`)
       .then(r => r.ok ? r.json() : [])
-      .then(list => setMatchingSavedId(list.length > 0 ? list[list.length - 1] : null))
+      .then(list => setMatchingSavedId(list.length > 0 ? (list.find((e: any) => e.active !== false) || list[list.length - 1]) : null))
       .catch(() => setMatchingSavedId(null));
   }, [selectedReq?.empCode]);
 
@@ -618,6 +618,29 @@ export default function IDRequests({ currentUser, onGoToBuilder }: Props) {
                   <div style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>
                     Saved ID: <strong>{matchingSavedId.employeeName}</strong> · Saved {matchingSavedId.savedAt}
                   </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => {
+                        const win = window.open();
+                        if (win) {
+                          win.document.write(`
+                            <html>
+                            <head><title>Print ID — ${matchingSavedId.employeeName}</title></head>
+                            <body style="margin:0; display:flex; flex-direction:column; align-items:center; gap:20px; padding:20px;">
+                              <img src="${matchingSavedId.frontImg}" style="width:240px; border:1px solid #ccc; border-radius:12px;"/>
+                              <img src="${matchingSavedId.backImg}" style="width:240px; border:1px solid #ccc; border-radius:12px;"/>
+                              <script>window.onload = function() { window.print(); window.close(); }</script>
+                            </body>
+                            </html>
+                          `);
+                          win.document.close();
+                        }
+                      }}
+                      style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 600, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Printer size={12} /> Reprint Existing ID
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -678,18 +701,60 @@ export default function IDRequests({ currentUser, onGoToBuilder }: Props) {
 
               {/* Admin: Proceed to ID Builder when approved */}
               {isAdmin && (selectedReq.status === 'approved' || selectedReq.status === 'processing') && (
-                <div style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', border: '1px solid #6ee7b7', borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <CheckCircle size={16} color="#059669" />
-                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#065f46' }}>Request Approved</p>
-                  </div>
-                  <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#047857' }}>
-                    This request is approved. You can now proceed to create the ID in the builder.
-                  </p>
-                  <button onClick={() => { onGoToBuilder(selectedReq); setSelectedReq(null); }}
-                    style={{ width: '100%', background: 'linear-gradient(135deg,#059669,#047857)', color: '#fff', border: 'none', borderRadius: '10px', padding: '11px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}>
-                    <Wand2 size={15} /> Proceed to ID Builder
-                  </button>
+                <div style={{ background: matchingSavedId ? 'linear-gradient(135deg,#fffbeb,#fef3c7)' : 'linear-gradient(135deg,#ecfdf5,#d1fae5)', border: matchingSavedId ? '1px solid #fcd34d' : '1px solid #6ee7b7', borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
+                  {matchingSavedId ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <AlertTriangle size={16} color="#d97706" />
+                        <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#92400e' }}>Existing ID Detected</p>
+                      </div>
+                      <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#b45309' }}>
+                        An ID was already previously generated for this employee on <strong>{matchingSavedId.savedAt}</strong>. 
+                        You can directly reprint the existing ID below or proceed to the ID Builder to generate a new layout (which will archive the previous one).
+                      </p>
+                      <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                        <button
+                          onClick={() => {
+                            const win = window.open();
+                            if (win) {
+                              win.document.write(`
+                                <html>
+                                <head><title>Print ID — ${matchingSavedId.employeeName}</title></head>
+                                <body style="margin:0; display:flex; flex-direction:column; align-items:center; gap:20px; padding:20px;">
+                                  <img src="${matchingSavedId.frontImg}" style="width:240px; border:1px solid #ccc; border-radius:12px;"/>
+                                  <img src="${matchingSavedId.backImg}" style="width:240px; border:1px solid #ccc; border-radius:12px;"/>
+                                  <script>window.onload = function() { window.print(); window.close(); }</script>
+                                </body>
+                                </html>
+                              `);
+                              win.document.close();
+                            }
+                          }}
+                          style={{ width: '100%', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
+                        >
+                          <Printer size={15} /> Reprint Existing ID
+                        </button>
+                        <button onClick={() => { onGoToBuilder(selectedReq); setSelectedReq(null); }}
+                          style={{ width: '100%', background: 'linear-gradient(135deg,#d97706,#b45309)', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
+                          <Wand2 size={15} /> Overwrite & Create New ID
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <CheckCircle size={16} color="#059669" />
+                        <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#065f46' }}>Request Approved</p>
+                      </div>
+                      <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#047857' }}>
+                        This request is approved. You can now proceed to create the ID in the builder.
+                      </p>
+                      <button onClick={() => { onGoToBuilder(selectedReq); setSelectedReq(null); }}
+                        style={{ width: '100%', background: 'linear-gradient(135deg,#059669,#047857)', color: '#fff', border: 'none', borderRadius: '10px', padding: '11px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}>
+                        <Wand2 size={15} /> Proceed to ID Builder
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 

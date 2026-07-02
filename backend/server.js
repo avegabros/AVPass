@@ -548,7 +548,8 @@ app.get('/api/verify/:token', async (req, res) => {
     // ── Step 1: Local saved_ids lookup (fastest — no HRIS scan needed) ──
     if (isHash) {
       const savedIds = readSavedIds();
-      const localMatch = savedIds.find(e => e.hash && e.hash.toLowerCase() === tokenParam.toLowerCase());
+      const localMatch = savedIds.find(e => e.hash && e.hash.toLowerCase() === tokenParam.toLowerCase() && e.active !== false) ||
+                         savedIds.find(e => e.hash && e.hash.toLowerCase() === tokenParam.toLowerCase());
       if (localMatch && localMatch.empCode) {
         console.log(`[VERIFY] local match: empCode=${localMatch.empCode}`);
         try {
@@ -961,6 +962,7 @@ app.post('/api/saved-ids', async (req, res) => {
   
   newEntry.abasRequestId = newEntry.abasRequestId || null;
   newEntry.abasEmployeeId = newEntry.abasEmployeeId || null;
+  newEntry.active = true;
 
   // Upload to MinIO bucket 'abas' under employees/employee-id folder
   const empIdFolder = newEntry.empCode || newEntry.abasEmployeeId || newEntry.employeeName || 'unknown';
@@ -971,21 +973,32 @@ app.post('/api/saved-ids', async (req, res) => {
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
 
+  const timestamp = Date.now();
+
   if (newEntry.frontImg && newEntry.frontImg.startsWith('data:')) {
-    newEntry.frontImg = await uploadBase64ToAbasMinio(newEntry.frontImg, `employees/${cleanedEmpId}/company_id_front.png`, 'image/png');
+    newEntry.frontImg = await uploadBase64ToAbasMinio(newEntry.frontImg, `employees/${cleanedEmpId}/company_id_front_${timestamp}.png`, 'image/png');
   }
   if (newEntry.backImg && newEntry.backImg.startsWith('data:')) {
-    newEntry.backImg = await uploadBase64ToAbasMinio(newEntry.backImg, `employees/${cleanedEmpId}/company_id_back.png`, 'image/png');
+    newEntry.backImg = await uploadBase64ToAbasMinio(newEntry.backImg, `employees/${cleanedEmpId}/company_id_back_${timestamp}.png`, 'image/png');
   }
   if (newEntry.avatarImg && newEntry.avatarImg.startsWith('data:')) {
-    newEntry.avatarImg = await uploadBase64ToAbasMinio(newEntry.avatarImg, `employees/${cleanedEmpId}/avatar.png`, 'image/png');
+    newEntry.avatarImg = await uploadBase64ToAbasMinio(newEntry.avatarImg, `employees/${cleanedEmpId}/avatar_${timestamp}.png`, 'image/png');
   }
   if (newEntry.signatureImg && newEntry.signatureImg.startsWith('data:')) {
-    newEntry.signatureImg = await uploadBase64ToAbasMinio(newEntry.signatureImg, `employees/${cleanedEmpId}/signature.png`, 'image/png');
+    newEntry.signatureImg = await uploadBase64ToAbasMinio(newEntry.signatureImg, `employees/${cleanedEmpId}/signature_${timestamp}.png`, 'image/png');
   }
 
-  // Replace if same employee+company already exists
-  const updated = [...existing.filter(e => !(e.employeeName === newEntry.employeeName && e.company === newEntry.company)), newEntry];
+  // Deactivate previous active saved IDs for the same employee
+  const updated = existing.map(e => {
+    const isSameEmp = (e.empCode && newEntry.empCode && String(e.empCode).toLowerCase() === String(newEntry.empCode).toLowerCase()) ||
+                      (e.employeeName === newEntry.employeeName && e.company === newEntry.company);
+    if (isSameEmp && e.active !== false) {
+      return { ...e, active: false };
+    }
+    return e;
+  });
+
+  updated.push(newEntry);
   fs.writeFileSync(IDS_FILE, JSON.stringify(updated, null, 2));
   console.log(`[SUCCESS] ID saved for ${newEntry.employeeName} (empCode=${newEntry.empCode} hash=${newEntry.hash})`);
   res.sendStatus(200);
@@ -1011,17 +1024,19 @@ app.patch('/api/saved-ids/:id', async (req, res) => {
       .replace(/_+/g, '_')
       .replace(/^_|_$/g, '');
 
+    const timestamp = Date.now();
+
     if (updates.frontImg && updates.frontImg.startsWith('data:')) {
-      updates.frontImg = await uploadBase64ToAbasMinio(updates.frontImg, `employees/${cleanedEmpId}/company_id_front.png`, 'image/png');
+      updates.frontImg = await uploadBase64ToAbasMinio(updates.frontImg, `employees/${cleanedEmpId}/company_id_front_${timestamp}.png`, 'image/png');
     }
     if (updates.backImg && updates.backImg.startsWith('data:')) {
-      updates.backImg = await uploadBase64ToAbasMinio(updates.backImg, `employees/${cleanedEmpId}/company_id_back.png`, 'image/png');
+      updates.backImg = await uploadBase64ToAbasMinio(updates.backImg, `employees/${cleanedEmpId}/company_id_back_${timestamp}.png`, 'image/png');
     }
     if (updates.avatarImg && updates.avatarImg.startsWith('data:')) {
-      updates.avatarImg = await uploadBase64ToAbasMinio(updates.avatarImg, `employees/${cleanedEmpId}/avatar.png`, 'image/png');
+      updates.avatarImg = await uploadBase64ToAbasMinio(updates.avatarImg, `employees/${cleanedEmpId}/avatar_${timestamp}.png`, 'image/png');
     }
     if (updates.signatureImg && updates.signatureImg.startsWith('data:')) {
-      updates.signatureImg = await uploadBase64ToAbasMinio(updates.signatureImg, `employees/${cleanedEmpId}/signature.png`, 'image/png');
+      updates.signatureImg = await uploadBase64ToAbasMinio(updates.signatureImg, `employees/${cleanedEmpId}/signature_${timestamp}.png`, 'image/png');
     }
 
     data[idx] = { ...data[idx], ...updates };
