@@ -538,6 +538,29 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
   React.useEffect(() => {
     if (_editingIDRef) {
       setEmpSearch(_editingIDRef.employeeName);
+      if (_editingIDRef.empCode) {
+        fetch(`${API_URL}/employees?search=${encodeURIComponent(_editingIDRef.empCode)}&limit=5`)
+          .then(r => r.ok ? r.json() : [])
+          .then(data => {
+            const list = Array.isArray(data) ? data : (data.data ?? []);
+            const exactMatch = list.find((e: any) => String(e.employee_id || e.id).toLowerCase() === String(_editingIDRef.empCode).toLowerCase());
+            if (exactMatch) {
+              const empRecord = {
+                id: exactMatch.id || exactMatch.employee_id || '',
+                name: exactMatch.full_name || exactMatch.name || '',
+                position: exactMatch.position || '',
+                empCode: exactMatch.employee_id || exactMatch.empCode || '',
+                photo: exactMatch.picture || null,
+                signature: exactMatch.signature || null,
+                company: exactMatch.company || '',
+                emergency_contact_person: exactMatch.emergency_contact_person || '',
+                emergency_contact_num: exactMatch.emergency_contact_num || '',
+              };
+              autoFill(empRecord);
+            }
+          })
+          .catch(err => console.error('[IDBuilder] Auto-load employee details failed:', err));
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -670,12 +693,12 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
   };
 
 
-  const employeePhoto = customPhoto || (selectedEmployee?.photo 
-    ? resolveImg(selectedEmployee.photo) 
-    : (editingID?.pictureUrl ? resolveImg(editingID.pictureUrl) : null));
-  const employeeSig   = customSig || (selectedEmployee?.signature 
-    ? resolveImg(selectedEmployee.signature) 
-    : (editingID?.signatureUrl ? resolveImg(editingID.signatureUrl) : null));
+  const employeePhoto = customPhoto || (editingID?.pictureUrl 
+    ? resolveImg(editingID.pictureUrl) 
+    : (selectedEmployee?.photo ? resolveImg(selectedEmployee.photo) : null));
+  const employeeSig   = customSig || (editingID?.signatureUrl 
+    ? resolveImg(editingID.signatureUrl) 
+    : (selectedEmployee?.signature ? resolveImg(selectedEmployee.signature) : null));
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1539,6 +1562,30 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
                       </div>
                     </div>
                   </div>
+                  {editingID && (editingID.pictureUrl || editingID.signatureUrl || editingID.supportingDocUrl) && (
+                      <div style={{ marginTop: '12px', padding: '10px', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                          Original Request Attachments
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px' }}>
+                          {editingID.pictureUrl && (
+                            <a href={resolveImg(editingID.pictureUrl)} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                              <span>📷 Download Original Photo (to remove background)</span>
+                            </a>
+                          )}
+                          {editingID.signatureUrl && (
+                            <a href={resolveImg(editingID.signatureUrl)} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                              <span>✍ Download Original Signature</span>
+                            </a>
+                          )}
+                          {editingID.supportingDocUrl && (
+                            <a href={resolveImg(editingID.supportingDocUrl)} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                              <span>📄 Download Supporting Document</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
             </AccSection>

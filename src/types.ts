@@ -112,6 +112,7 @@ export type ActiveSection = 'home' | 'database' | 'idbuilder' | 'idrecords' | 't
 export interface EditingID {
   id: string;
   employeeName: string;
+  empCode?: string;
   position: string;
   front: IDSide;
   back: IDSide;
@@ -119,6 +120,7 @@ export interface EditingID {
   abasRequestId?: number | null;
   pictureUrl?: string | null;
   signatureUrl?: string | null;
+  supportingDocUrl?: string | null;
 }
 
 export type RequestStatus =
