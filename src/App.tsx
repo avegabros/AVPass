@@ -320,13 +320,15 @@ export default function App() {
             setEditingID({
               id: '',
               employeeName: req.employeeName,
+              empCode: req.empCode,
               position: req.position,
               front: null as any,
               back: null as any,
               requestId: req.id,
               abasRequestId: req.abasRequestId,
               pictureUrl: req.pictureUrl,
-              signatureUrl: req.signatureUrl
+              signatureUrl: req.signatureUrl,
+              supportingDocUrl: req.supportingDocUrl
             });
             setActiveSection('idbuilder');
           }} />}
