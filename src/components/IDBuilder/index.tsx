@@ -1143,7 +1143,9 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
         signatureImg: sigB64,
         savedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
         abasRequestId: abasReqId,
-        abasEmployeeId: abasEmpId
+        abasEmployeeId: abasEmpId,
+        front,
+        back
       };
 
       let savedIdId = '';
