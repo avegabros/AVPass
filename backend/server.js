@@ -231,45 +231,52 @@ app.use(express.json({ limit: '50mb' }));
 
 // ── Smart Image Proxy ──
 // Serves locally if cached, otherwise fetches from avegabros.net and caches
-app.get('/images/:filename', async (req, res) => {
-  const filename = req.params.filename;
+app.get(/^\/images\/(.*)/, async (req, res) => {
+  const relativePath = req.params[0];
 
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  if (!filename || ['null', 'undefined', ''].includes(filename)) {
+  if (!relativePath || ['null', 'undefined', ''].includes(relativePath)) {
     return res.status(404).send('No image specified');
   }
 
-  const localPath = path.join(IMAGES_PATH, filename);
+  const localPath = path.join(IMAGES_PATH, relativePath);
 
   // 1. Serve locally if already cached
   if (fs.existsSync(localPath)) {
-    const ext = path.extname(filename).toLowerCase();
+    const ext = path.extname(relativePath).toLowerCase();
     const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
     if (mime[ext]) res.setHeader('Content-Type', mime[ext]);
     return res.sendFile(localPath);
   }
 
+  // Ensure local subdirectory exists
+  fs.mkdirSync(path.dirname(localPath), { recursive: true });
+
   // 1.5. Try fetching from MinIO first
   if (minioClient) {
     const bucketName = process.env.MINIO_BUCKET || 'company-id';
-    const possibleKeys = [
-      `hr/avatar/${filename}`,
-      `hr/employee_pictures/${filename}`,
-      `users/signatures/${filename}`,
-      `hr/signatures/${filename}`,
-      `hr/signature/${filename}`,
-      `signatures/${filename}`,
-      `signature/${filename}`,
-      `users/signature/${filename}`
-    ];
+    
+    // Check direct key first, then fall back to possible legacy prefixes if it's just a filename
+    const isFlatFile = !relativePath.includes('/');
+    const keysToCheck = isFlatFile ? [
+      relativePath,
+      `hr/avatar/${relativePath}`,
+      `hr/employee_pictures/${relativePath}`,
+      `users/signatures/${relativePath}`,
+      `hr/signatures/${relativePath}`,
+      `hr/signature/${relativePath}`,
+      `signatures/${relativePath}`,
+      `signature/${relativePath}`,
+      `users/signature/${relativePath}`
+    ] : [relativePath];
 
     let foundInMinio = false;
-    for (const objectKey of possibleKeys) {
+    for (const objectKey of keysToCheck) {
       try {
         console.log(`[PROXY] Checking MinIO: ${bucketName}/${objectKey}`);
         const stream = await minioClient.getObject(bucketName, objectKey);
-        const ext = path.extname(filename).toLowerCase();
+        const ext = path.extname(relativePath).toLowerCase();
         const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
         if (mime[ext]) res.setHeader('Content-Type', mime[ext]);
 
@@ -279,7 +286,7 @@ app.get('/images/:filename', async (req, res) => {
           writer.on('finish', resolve);
           writer.on('error', reject);
         });
-        console.log(`[PROXY] Cached from MinIO: ${filename} (via key ${objectKey})`);
+        console.log(`[PROXY] Cached from MinIO: ${relativePath} (via key ${objectKey})`);
         foundInMinio = true;
         break;
       } catch (minioErr) {
@@ -291,55 +298,57 @@ app.get('/images/:filename', async (req, res) => {
     }
   }
 
-  // 2. Fetch from remote — try photos folder first, then signatures folder
-  const BASES = [
-    'https://api.avegabros.org/',
-    'https://abas.avegabros.org/',
-    'https://abas-staging.avegabros.net/'
-  ];
-  const remotePaths = [
-    `signatures/${filename}`,
-    `assets/uploads/hr/avatar/${filename}`,
-    `assets/uploads/hr/employee_pictures/${filename}`,
-    `assets/uploads/users/signatures/${filename}`,
-    `assets/uploads/signatures/${filename}`,
-    `assets/uploads/hr/avatar/${filename}.png`,
-    `assets/uploads/hr/avatar/${filename}.jpg`,
-    `assets/uploads/hr/avatar/${filename}.jpeg`,
-    `assets/uploads/users/signatures/${filename}.png`,
-  ];
+  // 2. Fetch from remote if it's a flat filename
+  if (!relativePath.includes('/')) {
+    const filename = relativePath;
+    const BASES = [
+      'https://api.avegabros.org/',
+      'https://abas.avegabros.org/',
+      'https://abas-staging.avegabros.net/'
+    ];
+    const remotePaths = [
+      `signatures/${filename}`,
+      `assets/uploads/hr/avatar/${filename}`,
+      `assets/uploads/hr/employee_pictures/${filename}`,
+      `assets/uploads/users/signatures/${filename}`,
+      `assets/uploads/signatures/${filename}`,
+      `assets/uploads/hr/avatar/${filename}.png`,
+      `assets/uploads/hr/avatar/${filename}.jpg`,
+      `assets/uploads/hr/avatar/${filename}.jpeg`,
+      `assets/uploads/users/signatures/${filename}.png`,
+    ];
 
-  for (const base of BASES) {
-    let baseSuccess = false;
-    for (const remotePath of remotePaths) {
-      const remoteUrl = base + remotePath;
-      try {
-        console.log(`[PROXY] Fetching: ${remoteUrl}`);
-        const response = await axios({ url: remoteUrl, method: 'GET', responseType: 'stream', timeout: 8000 });
+    for (const base of BASES) {
+      let baseSuccess = false;
+      for (const remotePath of remotePaths) {
+        const remoteUrl = base + remotePath;
+        try {
+          console.log(`[PROXY] Fetching: ${remoteUrl}`);
+          const response = await axios({ url: remoteUrl, method: 'GET', responseType: 'stream', timeout: 8000 });
 
-        // ── Skip if response is not an actual image (e.g. HTML 404 page) ──
-        const contentType = response.headers['content-type'] || '';
-        if (!contentType.startsWith('image/')) {
-          console.log(`[PROXY] Skipping non-image response (${contentType}): ${remoteUrl}`);
-          response.data.destroy(); // close the stream
-          continue;
-        }
+          const contentType = response.headers['content-type'] || '';
+          if (!contentType.startsWith('image/')) {
+            console.log(`[PROXY] Skipping non-image response (${contentType}): ${remoteUrl}`);
+            response.data.destroy(); // close stream
+            continue;
+          }
 
-        res.setHeader('Content-Type', contentType);
-        const writer = fs.createWriteStream(localPath);
-        response.data.pipe(writer);
-        await new Promise((resolve) => {
-          writer.on('finish', () => { console.log(`[PROXY] Cached: ${filename}`); res.sendFile(localPath); resolve(undefined); });
-          writer.on('error', (err) => { console.error('[PROXY] Write error:', err); res.status(500).send('Storage error'); resolve(undefined); });
-        });
-        baseSuccess = true;
-        break;
-      } catch { continue; }
+          res.setHeader('Content-Type', contentType);
+          const writer = fs.createWriteStream(localPath);
+          response.data.pipe(writer);
+          await new Promise((resolve) => {
+            writer.on('finish', () => { console.log(`[PROXY] Cached remote image: ${filename}`); res.sendFile(localPath); resolve(undefined); });
+            writer.on('error', (err) => { console.error('[PROXY] Write error:', err); res.status(500).send('Storage error'); resolve(undefined); });
+          });
+          baseSuccess = true;
+          break;
+        } catch { continue; }
+      }
+      if (baseSuccess) return;
     }
-    if (baseSuccess) return;
   }
 
-  console.error(`[PROXY 404] Not found: ${filename}`);
+  console.error(`[PROXY 404] Not found: ${relativePath}`);
   res.status(404).send('Image not found');
 });
 

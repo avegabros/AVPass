@@ -332,7 +332,7 @@ export default function App() {
             });
             setActiveSection('idbuilder');
           }} />}
-          {activeSection === 'idrecords' && <SavedIDs savedIDs={savedIDs} setSavedIDs={setSavedIDs} onEditInBuilder={entry => { setEditingID({ id: entry.id, employeeName: entry.employeeName, position: entry.position, front: entry.front, back: entry.back }); setActiveSection('idbuilder'); }} />}
+          {activeSection === 'idrecords' && <SavedIDs savedIDs={savedIDs} setSavedIDs={setSavedIDs} onEditInBuilder={entry => { setEditingID({ id: entry.id, employeeName: entry.employeeName, empCode: entry.empCode, position: entry.position, front: entry.front, back: entry.back, pictureUrl: entry.avatarImg, signatureUrl: entry.signatureImg, abasRequestId: entry.abasRequestId, abasEmployeeId: entry.abasEmployeeId }); setActiveSection('idbuilder'); }} />}
         </div>
 
         {/* ── MOBILE BOTTOM NAV ── */}

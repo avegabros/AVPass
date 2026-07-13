@@ -7,8 +7,21 @@ export function resolveImg(url: string | null | undefined): string | null {
   if (u.startsWith('data:')) return u;
   if (u.startsWith('/images/')) return u;
   
-  // Extract filename (strip query string and hashes)
+  // Extract filename/path (strip query string and hashes)
   const cleanUrl = u.split('?')[0].split('#')[0];
+  
+  // If it's a MinIO URL, preserve the key relative to the bucket name (abas)
+  try {
+    const bucketName = 'abas';
+    const bucketIdx = cleanUrl.indexOf('/' + bucketName + '/');
+    if (bucketIdx !== -1) {
+      const subpath = cleanUrl.substring(bucketIdx + bucketName.length + 2); // +2 for slashes
+      return '/images/' + subpath;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
   const parts = cleanUrl.split('/');
   const filename = parts[parts.length - 1];
   return '/images/' + filename;

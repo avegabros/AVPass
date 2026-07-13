@@ -123,6 +123,7 @@ export interface EditingID {
   back: IDSide;
   requestId?: string;
   abasRequestId?: number | null;
+  abasEmployeeId?: number | string | null;
   pictureUrl?: string | null;
   signatureUrl?: string | null;
   supportingDocUrl?: string | null;

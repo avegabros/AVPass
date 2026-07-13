@@ -1224,8 +1224,73 @@ export default function IDBuilder({ editingID, onEditSaved, pendingTemplate, onT
       const missing = defaults.filter(f => !ids.has(f.id));
       return [...templateFields, ...missing];
     };
-    const mergedBack  = { ...t.back,  fields: mergeFields(t.back.fields,  defaultBackFields)  };
-    const mergedFront = { ...t.front, fields: mergeFields(t.front.fields, defaultFrontFields) };
+
+    const applyEmployeeDataToFields = (fields: IDField[]): IDField[] => {
+      const emp = selectedEmployee as any;
+      const editId = editingID as any;
+      if (!emp && !editId) return fields;
+
+      return fields.map(f => {
+        if (f.id === 'fullname') {
+          if (emp) return { ...f, value: formatFullName(emp) };
+          if (editId) return { ...f, value: editId.employeeName };
+        }
+        if (f.id === 'nickname') {
+          if (emp) {
+            const first = emp.firstname || emp.first_name || '';
+            if (first.trim()) return { ...f, value: first.trim().toUpperCase() };
+            const commaIdx = emp.name.indexOf(',');
+            let firstName = emp.name;
+            if (commaIdx !== -1) {
+              const afterComma = emp.name.slice(commaIdx + 1).trim();
+              firstName = afterComma.split(' ')[0] || afterComma;
+            }
+            return { ...f, value: firstName.toUpperCase() };
+          }
+          if (editId) {
+            const commaIdx = editId.employeeName.indexOf(',');
+            let firstName = editId.employeeName;
+            if (commaIdx !== -1) {
+              const afterComma = editId.employeeName.slice(commaIdx + 1).trim();
+              firstName = afterComma.split(' ')[0] || afterComma;
+            }
+            return { ...f, value: firstName.toUpperCase() };
+          }
+        }
+        if (f.id === 'position') {
+          if (emp) return { ...f, value: emp.position || '' };
+          if (editId) return { ...f, value: editId.position || '' };
+        }
+        if (f.id === 'idnum') {
+          if (emp && emp.empCode) return { ...f, value: emp.empCode };
+          if (editId && editId.empCode) return { ...f, value: editId.empCode };
+        }
+        if (f.id === 'company') {
+          if (emp && emp.company) return { ...f, value: emp.company };
+          if (editId && editId.company) return { ...f, value: editId.company };
+        }
+        if (f.id === 'emergency_num') {
+          if (emp && emp.emergency_contact_num) return { ...f, value: emp.emergency_contact_num };
+          if (editId && (editId as any).emergency_contact_num) return { ...f, value: (editId as any).emergency_contact_num };
+        }
+        if (f.id === 'emergency_person') {
+          if (emp && emp.emergency_contact_person) return { ...f, value: emp.emergency_contact_person };
+          if (editId && (editId as any).emergency_contact_person) return { ...f, value: (editId as any).emergency_contact_person };
+        }
+        if (f.id === 'company_back') {
+          if (emp && emp.company) return { ...f, value: emp.company };
+          if (editId && editId.company) return { ...f, value: editId.company };
+        }
+        return f;
+      });
+    };
+
+    const mergedBackFields  = applyEmployeeDataToFields(mergeFields(t.back.fields,  defaultBackFields));
+    const mergedFrontFields = applyEmployeeDataToFields(mergeFields(t.front.fields, defaultFrontFields));
+
+    const mergedBack  = { ...t.back,  fields: mergedBackFields  };
+    const mergedFront = { ...t.front, fields: mergedFrontFields };
+
     setFront(mergedFront); setBack(mergedBack);
     pushHistory(mergedFront, mergedBack);
     showMsg("success",`Loaded "${t.name}"`);
