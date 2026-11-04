@@ -961,12 +961,23 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
     if (!templateName.trim()) return;
     setSavingTemplate(true);
     const t: IDTemplate = { id: Date.now().toString(), name: templateName.trim(), company: templateCompany.trim(), createdAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }), front, back };
-    const existing = await fetch(`${API_URL}/templates`).then(r => r.ok ? r.json() : []).catch(() => []);
-    const updated = editingTemplate ? existing.map((x: IDTemplate) => x.id === editingTemplate.id ? t : { ...x, id: x.id }) : [...existing, t];
-    await fetch(`${API_URL}/templates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
-    showMsg('success', editingTemplate ? 'Template updated!' : `Template "${t.name}" saved!`);
-    if (!editingTemplate) { setTemplateName(''); setTemplateCompany(''); }
-    setSavingTemplate(false);
+    try {
+      // Never fall back to [] on failure: that would overwrite all existing templates.
+      const getRes = await fetch(`${API_URL}/templates`);
+      if (!getRes.ok) throw new Error(`Could not load existing templates (${getRes.status})`);
+      const existing: IDTemplate[] = await getRes.json();
+      const updated = editingTemplate ? existing.map((x: IDTemplate) => x.id === editingTemplate.id ? t : x) : [...existing, t];
+      const res = await fetch(`${API_URL}/templates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+      if (!res.ok) throw new Error(res.status === 413 ? 'Template is too large to save' : `Server error (${res.status})`);
+      setTemplates(updated);
+      showMsg('success', editingTemplate ? 'Template updated!' : `Template "${t.name}" saved!`);
+      if (!editingTemplate) { setTemplateName(''); setTemplateCompany(''); }
+    } catch (err: any) {
+      console.error('[TemplateManager] save failed:', err);
+      showMsg('error', `Failed to save template: ${err?.message || 'connection error'}`);
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
   const loadTemplate = (t: IDTemplate) => { setFront(ensureFrontCompany({ ...t.front })); setBack(ensureBackCompany({ ...t.back })); setTemplateName(t.name); setTemplateCompany(t.company || ''); pushHistory(t.front, t.back); showMsg('success', `Loaded "${t.name}"`); setShowTemplateModal(false); };
