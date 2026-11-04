@@ -562,6 +562,7 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
   const [showTemplateModal, setShowTemplateModal] = React.useState(false);
   const [templateName, setTemplateName] = React.useState(editingTemplate?.name || '');
   const [templateCompany, setTemplateCompany] = React.useState(editingTemplate?.company || '');
+  const [showSaveModal, setShowSaveModal] = React.useState(false);
   React.useEffect(() => { fetch(`${API_URL}/templates`).then(r => r.ok ? r.json() : []).then(setTemplates).catch(() => {}); }, []);
 
   // notifications
@@ -957,16 +958,41 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
     const a = document.createElement('a'); a.download = `id-${w}-${Date.now()}.jpg`; a.href = url; a.click();
   };
 
-  const saveAsTemplate = async () => {
-    if (!templateName.trim()) return;
+  const handleSaveClick = () => {
+    if (!templateName.trim()) {
+      setShowSaveModal(true);
+    } else {
+      saveAsTemplate();
+    }
+  };
+
+  const saveAsTemplate = async (customName?: string, customCompany?: string) => {
+    const finalName = (customName !== undefined ? customName : templateName).trim();
+    const finalCompany = (customCompany !== undefined ? customCompany : templateCompany).trim();
+    if (!finalName) {
+      setShowSaveModal(true);
+      return;
+    }
     setSavingTemplate(true);
-    const t: IDTemplate = { id: Date.now().toString(), name: templateName.trim(), company: templateCompany.trim(), createdAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }), front, back };
-    const existing = await fetch(`${API_URL}/templates`).then(r => r.ok ? r.json() : []).catch(() => []);
-    const updated = editingTemplate ? existing.map((x: IDTemplate) => x.id === editingTemplate.id ? t : { ...x, id: x.id }) : [...existing, t];
-    await fetch(`${API_URL}/templates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
-    showMsg('success', editingTemplate ? 'Template updated!' : `Template "${t.name}" saved!`);
-    if (!editingTemplate) { setTemplateName(''); setTemplateCompany(''); }
-    setSavingTemplate(false);
+    const t: IDTemplate = { id: editingTemplate ? editingTemplate.id : Date.now().toString(), name: finalName, company: finalCompany, createdAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }), front, back };
+    try {
+      // Never fall back to [] on failure: that would overwrite all existing templates.
+      const getRes = await fetch(`${API_URL}/templates`);
+      if (!getRes.ok) throw new Error(`Could not load existing templates (${getRes.status})`);
+      const existing: IDTemplate[] = await getRes.json();
+      const updated = editingTemplate ? existing.map((x: IDTemplate) => x.id === editingTemplate.id ? t : x) : [...existing, t];
+      const res = await fetch(`${API_URL}/templates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+      if (!res.ok) throw new Error(res.status === 413 ? 'Template is too large to save' : `Server error (${res.status})`);
+      setTemplates(updated);
+      showMsg('success', editingTemplate ? 'Template updated!' : `Template "${t.name}" saved!`);
+      setShowSaveModal(false);
+      if (!editingTemplate) { setTemplateName(''); setTemplateCompany(''); }
+    } catch (err: any) {
+      console.error('[TemplateManager] save failed:', err);
+      showMsg('error', `Failed to save template: ${err?.message || 'connection error'}`);
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
   const loadTemplate = (t: IDTemplate) => { setFront(ensureFrontCompany({ ...t.front })); setBack(ensureBackCompany({ ...t.back })); setTemplateName(t.name); setTemplateCompany(t.company || ''); pushHistory(t.front, t.back); showMsg('success', `Loaded "${t.name}"`); setShowTemplateModal(false); };
@@ -1164,8 +1190,9 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
             {!isMobile && <button onClick={handlePrint} style={navBtn} onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f8fafc'} onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#fff'}><Printer size={13} /> Print</button>}
             <div style={{ width: 1, height: 22, background: '#e2e8f0' }} />
             <button onClick={() => downloadSide(activeSide)} style={{ ...navBtn, background: '#f8fafc' }}><Download size={13} color="#667eea" /> Export</button>
-            <button onClick={saveAsTemplate} disabled={savingTemplate || !templateName.trim()}
-              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: templateName.trim() ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', color: templateName.trim() ? '#fff' : '#94a3b8', cursor: templateName.trim() ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7, boxShadow: templateName.trim() ? '0 4px 12px rgba(16,185,129,0.3)' : 'none' }}>
+            <button onClick={handleSaveClick} disabled={savingTemplate}
+              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+              title={templateName.trim() ? 'Save template' : 'Save template (enter a template name)'}>
               {savingTemplate ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />} Save
             </button>
           </div>
@@ -1719,6 +1746,64 @@ export default function TemplateManager({ editingTemplate, onBack }: TemplateMan
           </div>
         </div>
       </div>
+
+      {/* ═══ SAVE TEMPLATE MODAL ═══ */}
+      {showSaveModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)', padding: 16 }} onClick={() => setShowSaveModal(false)}>
+          <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.28)', overflow: 'hidden', animation: 'modalIn 0.2s cubic-bezier(0.34,1.56,0.64,1)', padding: 24 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ background: 'linear-gradient(135deg,#10b981,#059669)', borderRadius: 8, padding: 8, color: '#fff', display: 'flex' }}>
+                  <Save size={16} />
+                </div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Save Template</h3>
+              </div>
+              <button onClick={() => setShowSaveModal(false)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                <X size={14} />
+              </button>
+            </div>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+              Enter a name for this ID template to save your design layout.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>Template Name *</label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={templateName}
+                  onChange={e => setTemplateName(e.target.value)}
+                  placeholder="e.g. Standard Company ID"
+                  onKeyDown={e => { if (e.key === 'Enter' && templateName.trim()) saveAsTemplate(); }}
+                  style={{ ...inpStyle, border: !templateName.trim() ? '1px solid #cbd5e1' : '1px solid #10b981' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>Company (optional)</label>
+                <input
+                  type="text"
+                  value={templateCompany}
+                  onChange={e => setTemplateCompany(e.target.value)}
+                  placeholder="e.g. Avega Bros"
+                  onKeyDown={e => { if (e.key === 'Enter' && templateName.trim()) saveAsTemplate(); }}
+                  style={inpStyle}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowSaveModal(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button
+                onClick={() => saveAsTemplate()}
+                disabled={savingTemplate || !templateName.trim()}
+                style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: templateName.trim() ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', color: templateName.trim() ? '#fff' : '#94a3b8', cursor: templateName.trim() ? 'pointer' : 'not-allowed', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: templateName.trim() ? '0 4px 12px rgba(16,185,129,0.3)' : 'none' }}>
+                {savingTemplate ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />} Save Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ TEMPLATE MODAL ═══ */}
       {showTemplateModal && (
