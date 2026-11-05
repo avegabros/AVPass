@@ -1267,8 +1267,18 @@ app.post('/api/id-requests/abas/:abasRequestId', express.json(), async (req, res
           position:     response.data.position     || '',
           purpose:      response.data.purpose      || '',
           requestedBy:  response.data.requestedBy  || 'ABAS-HR',
-          status:       response.data.status       || 'pending',
-          statusHistory: [{ status: response.data.status || 'pending', note: 'Synced from ABAS', changedAt: now }],
+          status:       ((s) => {
+            const raw = (s || 'pending').toString().trim().toLowerCase();
+            if (raw === 'id_ready' || raw === 'id ready' || raw === 'ready') return 'for releasing';
+            if (raw === 'claimed') return 'claimed';
+            return raw;
+          })(response.data.status),
+          statusHistory: [{ status: ((s) => {
+            const raw = (s || 'pending').toString().trim().toLowerCase();
+            if (raw === 'id_ready' || raw === 'id ready' || raw === 'ready') return 'for releasing';
+            if (raw === 'claimed') return 'claimed';
+            return raw;
+          })(response.data.status), note: 'Synced from ABAS', changedAt: now }],
           createdAt:    now,
           updatedAt:    now,
           abasRequestId: response.data.abasRequestId || null,
@@ -1302,14 +1312,24 @@ app.post('/api/id-requests/abas/:abasRequestId', express.json(), async (req, res
     changed = true;
   }
 
-  if (status && status.toLowerCase() !== existing.status) {
-    existing.status = status.toLowerCase(); // Map to lowercase AVPass statuses
-    existing.statusHistory = [
-      ...(existing.statusHistory || []),
-      { status: status.toLowerCase(), note: note || 'Updated from ABAS IT Helpdesk', changedAt: now }
-    ];
-    existing.updatedAt = now;
-    changed = true;
+  if (status) {
+    const rawStatus = status.trim().toLowerCase();
+    let mappedStatus = rawStatus;
+    if (rawStatus === 'id_ready' || rawStatus === 'id ready' || rawStatus === 'ready') {
+      mappedStatus = 'for releasing';
+    } else if (rawStatus === 'claimed') {
+      mappedStatus = 'claimed';
+    }
+
+    if (mappedStatus !== existing.status) {
+      existing.status = mappedStatus;
+      existing.statusHistory = [
+        ...(existing.statusHistory || []),
+        { status: mappedStatus, note: note || 'Updated from ABAS IT Helpdesk', changedAt: now }
+      ];
+      existing.updatedAt = now;
+      changed = true;
+    }
   }
 
   if (changed) {
